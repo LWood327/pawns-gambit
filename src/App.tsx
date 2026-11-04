@@ -3,11 +3,16 @@ import { ThemeContext, getTheme, lavaCracks, loadThemePrefs, saveThemePrefs } fr
 import { flushSync } from 'react-dom';
 import { Home } from './Home';
 import { GameScreen } from './GameScreen';
+import { OnlineGame } from './OnlineGame';
+import type { StartRequest } from './online';
 import { PieceDefs } from './pieces';
 import { loadMuted, loadSettings, saveMuted, saveSettings, type BotGameSettings } from './settings';
 import { setMuted as setSoundMuted } from './sound';
 
-type Screen = { name: 'home'; view: 'menu' | 'bot' } | { name: 'game'; key: number };
+type Screen =
+  | { name: 'home'; view: 'menu' | 'bot' | 'online' }
+  | { name: 'game'; key: number }
+  | { name: 'online'; key: number; start: StartRequest };
 
 /** Animates between screens with the View Transitions API when available. */
 function transition(update: () => void) {
@@ -66,6 +71,14 @@ export default function App() {
           onToggleMute={toggleMute}
           onExit={() => transition(() => setScreen({ name: 'home', view: 'bot' }))}
         />
+      ) : screen.name === 'online' ? (
+        <OnlineGame
+          key={screen.key}
+          start={screen.start}
+          muted={muted}
+          onToggleMute={toggleMute}
+          onExit={() => transition(() => setScreen({ name: 'home', view: 'online' }))}
+        />
       ) : (
         <Home
           key={screen.view}
@@ -73,6 +86,7 @@ export default function App() {
           settings={settings}
           onChangeSettings={changeSettings}
           onStart={() => transition(() => setScreen({ name: 'game', key: Date.now() }))}
+          onStartOnline={(start) => transition(() => setScreen({ name: 'online', key: Date.now(), start }))}
           themePrefs={themePrefs}
           onChangeTheme={changeTheme}
         />

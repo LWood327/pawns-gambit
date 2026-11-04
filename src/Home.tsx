@@ -3,7 +3,8 @@ import { Chess } from 'chess.js';
 import { Board, type LastMove } from './Board';
 import { Piece } from './pieces';
 import { IconBack } from './icons';
-import { THEMES, useTheme, type Theme } from './themes';
+import { THEMES, type Theme } from './themes';
+import { loadName, saveName, type StartRequest } from './online';
 import { LEVELS, TIME_CONTROLS, levelName, timeControl, type BotGameSettings, type SideChoice } from './settings';
 
 // Paul Morphy vs. Duke Karl and Count Isouard, Paris Opera, 1858.
@@ -17,7 +18,6 @@ function DemoBoard() {
   const [version, setVersion] = useState(0);
   const [lastMove, setLastMove] = useState<LastMove | null>(null);
   const idRef = useRef(0);
-  const { theme } = useTheme();
 
   useEffect(() => {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -65,9 +65,6 @@ function DemoBoard() {
           className="demo-board"
         />
       </div>
-      <figcaption>
-        {theme.id !== 'walnut' && `${theme.name} board. `}Morphy’s Opera Game, Paris 1858
-      </figcaption>
     </figure>
   );
 }
@@ -82,7 +79,8 @@ interface Props {
   settings: BotGameSettings;
   onChangeSettings: (s: BotGameSettings) => void;
   onStart: () => void;
-  initialView?: 'menu' | 'bot';
+  onStartOnline: (r: StartRequest) => void;
+  initialView?: 'menu' | 'bot' | 'online';
   themePrefs: { id: string; calm: boolean };
   onChangeTheme: (p: { id: string; calm: boolean }) => void;
 }
@@ -149,12 +147,102 @@ function ThemesView({
   );
 }
 
-export function Home({ settings, onChangeSettings, onStart, initialView = 'menu', themePrefs, onChangeTheme }: Props) {
-  const [view, setView] = useState<'menu' | 'bot' | 'themes'>(initialView);
+function OnlineView({ onStart, onBack }: { onStart: (r: StartRequest) => void; onBack: () => void }) {
+  const [name, setName] = useState(loadName);
+  const [timeId, setTimeId] = useState('10');
+  const [side, setSide] = useState<SideChoice>('random');
+  const [code, setCode] = useState('');
+  const nameOk = name.trim().length > 0;
+
+  const go = (r: StartRequest) => {
+    saveName(name.trim());
+    onStart(r);
+  };
+
+  return (
+    <div className="setup-view online-view">
+      <button className="text-btn back" onClick={onBack}>
+        <IconBack /> Back
+      </button>
+      <h2 className="setup-title">Play a friend</h2>
+
+      <label className="setup-group text-field">
+        <span className="legend-like">Your name</span>
+        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={24} placeholder="What your friend will see" />
+      </label>
+
+      <fieldset className="setup-group">
+        <legend>Host a match</legend>
+        <div className="time-pick" role="radiogroup" aria-label="Clock">
+          {TIME_CONTROLS.map((t) => (
+            <button key={t.id} role="radio" title={t.description} aria-checked={timeId === t.id} onClick={() => setTimeId(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <p className="hint-text">{timeControl(timeId).description}</p>
+        <div className="side-pick compact" role="radiogroup" aria-label="Your pieces">
+          {(
+            [
+              ['w', 'White'],
+              ['random', 'Random'],
+              ['b', 'Black'],
+            ] as [SideChoice, string][]
+          ).map(([v, label]) => (
+            <button key={v} role="radio" aria-checked={side === v} onClick={() => setSide(v)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          className="primary start"
+          disabled={!nameOk}
+          onClick={() => go({ mode: 'create', name: name.trim(), timeId, side })}
+        >
+          Host match
+        </button>
+      </fieldset>
+
+      <form
+        className="setup-group join-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (nameOk && code.trim()) go({ mode: 'join', name: name.trim(), code: code.trim().toUpperCase() });
+        }}
+      >
+        <span className="legend-like">Join a match</span>
+        <div className="join-inputs">
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="Room code, like KNIGHT-42"
+            maxLength={20}
+            aria-label="Room code"
+          />
+          <button className="secondary" type="submit" disabled={!nameOk || !code.trim()}>
+            Join
+          </button>
+        </div>
+      </form>
+      {!nameOk && <p className="hint-text">Enter your name to host or join a match.</p>}
+    </div>
+  );
+}
+
+export function Home({
+  settings,
+  onChangeSettings,
+  onStart,
+  onStartOnline,
+  initialView = 'menu',
+  themePrefs,
+  onChangeTheme,
+}: Props) {
+  const [view, setView] = useState<'menu' | 'bot' | 'themes' | 'online'>(initialView);
 
   const items: MenuItem[] = [
     { title: 'Play the computer', detail: 'Pick a strength and a clock, then play Stockfish.', onSelect: () => setView('bot') },
-    { title: 'Play a friend online', detail: 'Share a room code and play from two computers.' },
+    { title: 'Play a friend online', detail: 'Share a room code and play from two computers.', onSelect: () => setView('online') },
     { title: 'Trainer', detail: 'Puzzles from your own mistakes, and opening practice.' },
     { title: 'Board themes', detail: 'Lava, ice, deep space and more.', onSelect: () => setView('themes') },
   ];
@@ -192,6 +280,8 @@ export function Home({ settings, onChangeSettings, onStart, initialView = 'menu'
           </div>
         ) : view === 'themes' ? (
           <ThemesView key="themes" themePrefs={themePrefs} onChangeTheme={onChangeTheme} onBack={() => setView('menu')} />
+        ) : view === 'online' ? (
+          <OnlineView key="online" onStart={onStartOnline} onBack={() => setView('menu')} />
         ) : (
           <div className="setup-view" key="bot">
             <button className="text-btn back" onClick={() => setView('menu')}>

@@ -1,0 +1,17 @@
+{
+  "name": "pawns-gambit-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "chess.js": "1.4.0",
+    "ws": "8.18.0"
+  }
+}

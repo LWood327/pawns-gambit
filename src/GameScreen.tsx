@@ -28,7 +28,7 @@ function pickSide(choice: BotGameSettings['side']): Color {
 }
 
 /** Pieces each side has captured, plus the material lead. */
-function captured(game: Chess) {
+export function captured(game: Chess) {
   const left: Record<Color, Record<PieceSymbol, number>> = {
     w: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
     b: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
@@ -69,7 +69,7 @@ function resultText(game: Chess, player: Color, ending: Ending) {
   return null;
 }
 
-function formatClock(ms: number) {
+export function formatClock(ms: number) {
   const clamped = Math.max(0, ms);
   if (clamped < 10_000) return (Math.floor(clamped / 100) / 10).toFixed(1);
   const total = Math.ceil(clamped / 1000);

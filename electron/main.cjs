@@ -15,6 +15,8 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",
   "img-src 'self' data:",
+  // Online play talks to the room server over WebSockets.
+  "connect-src 'self' ws://localhost:8787 wss:",
 ].join('; ');
 
 protocol.registerSchemesAsPrivileged([
