@@ -1,52 +1,116 @@
 import type { Color, PieceSymbol } from 'chess.js';
 
-// Custom flat silhouettes on a 45×45 grid. Fill and outline come from CSS
-// variables so each board theme can recolor (or make glow) the pieces.
+// Staunton-style pieces on a 45×45 grid, shaded like turned wood or ivory.
+// Colors come from CSS variables so board themes can restyle them.
 
-const BASE = 'M10 36.5h25a1.5 1.5 0 0 1 1.5 1.5v3H8.5v-3a1.5 1.5 0 0 1 1.5-1.5z';
+type Part = { d: string; trim?: boolean };
 
-const BODY: Record<PieceSymbol, string[]> = {
+// Two-tier turned base shared by every piece.
+const BASE: Part[] = [
+  { d: 'M11 40h23a1.6 1.6 0 0 0 1.6-1.6v-.9a2.2 2.2 0 0 0-2.2-2.2H11.6a2.2 2.2 0 0 0-2.2 2.2v.9A1.6 1.6 0 0 0 11 40z' },
+  { d: 'M13.2 35.3c0-1.7 1.3-2.8 2.9-2.8h12.8c1.6 0 2.9 1.1 2.9 2.8z', trim: true },
+];
+
+const PARTS: Record<PieceSymbol, Part[]> = {
   p: [
-    'M22.5 8a5.5 5.5 0 0 1 3.4 9.8c2.3 1.2 3.9 3.4 4.1 5.7h-3.4c.7 4.3 3.4 8.3 6.4 11V36.5H12V34.5c3-2.7 5.7-6.7 6.4-11H15c.2-2.3 1.8-4.5 4.1-5.7A5.5 5.5 0 0 1 22.5 8z',
+    { d: 'M16.4 32.5c1.5-3.1 3.1-6.4 3.6-10.3h5c.5 3.9 2.1 7.2 3.6 10.3z' },
+    { d: 'M17.6 19.9h9.8a1.6 1.6 0 0 1 0 3.2h-9.8a1.6 1.6 0 0 1 0-3.2z', trim: true },
+    { d: 'M22.5 8.6a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11z' },
   ],
-  r: ['M11 8.5h5v3.5h4.3V8.5h4.4V12H29V8.5h5v7.5l-3.2 3v13l3.2 3.5v2H11v-2l3.2-3.5V19L11 16z'],
+  r: [
+    { d: 'M15 32.5l1.4-13.9h12.2l1.4 13.9z' },
+    { d: 'M14.4 16.1h16.2a1.3 1.3 0 0 1 0 2.6H14.4a1.3 1.3 0 0 1 0-2.6z', trim: true },
+    { d: 'M13 16.1V9.6a.6.6 0 0 1 .6-.6h3.1a.6.6 0 0 1 .6.6v2.3h2.9V9.6a.6.6 0 0 1 .6-.6h3.6a.6.6 0 0 1 .6.6v2.3h2.9V9.6a.6.6 0 0 1 .6-.6h3.1a.6.6 0 0 1 .6.6v6.5z' },
+  ],
   n: [
-    'M23.5 7.5c8 .6 13.5 7.5 13.5 17.5v11.5H15.5c-.3-4.6 1.7-7.8 5.5-10.6 2.3-1.7 3-3.6 2.5-5.6-1.7 2.1-4.3 2.8-6.6 3.3l-2.7 2.9-3.6-.8c-1.4-1.1-1.7-3.1-.6-5l6.7-8.6c1.2-1.6 1.8-3.3 2.1-5l2.4 2.1z',
+    {
+      d: 'M15.4 32.5c.5-3.4 1.5-5.4 3.2-7.3-2.3.2-5-.2-7.2-1.4-1.4-.6-2.1-1.6-1.8-2.9.3-1.3 1-2.3 2-3.3l4.4-5c.8-1.3 1.6-2.8 2.4-4.3l1.8-2.9 1.6 2.6c.8-.8 1.8-1.4 3-1.7l.6 2.7c5 1.6 8 6 8 12.6 0 4-.8 7.6-1.6 10.9z',
+    },
   ],
   b: [
-    'M22.5 9.5c-5 3.4-8 8-8 12.3 0 3 1.6 5.1 4 6.1l-2.3 5.6h12.6l-2.3-5.6c2.4-1 4-3.1 4-6.1 0-4.3-3-8.9-8-12.3z',
-    'M22.5 4.3a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8z',
-    'M14 33.5h17l1 3H13z',
+    { d: 'M16.4 32.5c.9-3 1.9-5.4 2.5-8.1h7.2c.6 2.7 1.6 5.1 2.5 8.1z' },
+    { d: 'M17.8 22.2h9.4a1.3 1.3 0 0 1 0 2.6h-9.4a1.3 1.3 0 0 1 0-2.6z', trim: true },
+    { d: 'M22.5 7.9c-4.6 3.2-7 7-7 10.4 0 2.3 1.4 3.8 3.2 3.9h7.6c1.8-.1 3.2-1.6 3.2-3.9 0-3.4-2.4-7.2-7-10.4z' },
+    { d: 'M22.5 3.6a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2z', trim: true },
   ],
   q: [
-    'M8.5 13.5l6 9.2 2.4-11.6 3.6 11 2-12 2 12 3.6-11 2.4 11.6 6-9.2-4 17.5H12.5z',
-    'M12 31h21l1 5.5H11z',
+    { d: 'M15 32.5c1.3-3.8 2.7-8 3.4-12.1h8.2c.7 4.1 2.1 8.3 3.4 12.1z' },
+    { d: 'M16.3 18.2h12.4a1.3 1.3 0 0 1 0 2.6H16.3a1.3 1.3 0 0 1 0-2.6z', trim: true },
+    { d: 'M14.6 18.2l-2.3-8.3 4.4 4.7 2.1-6.5 1.9 5.2 1.8-6.6 1.8 6.6 1.9-5.2 2.1 6.5 4.4-4.7-2.3 8.3z' },
+    { d: 'M12.2 7.6a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4zM18.8 5.6a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2zM22.5 4.2a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4zM26.2 5.6a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2zM32.8 7.6a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4z', trim: true },
   ],
   k: [
-    'M21 3.5h3v3h3v3h-3V14h-3V9.5h-3v-3h3z',
-    'M22.5 14c-2.6 0-3.8 2.6-3.8 4.6-5.4-3.6-12.2-1.3-12.2 4.1 0 4 3.6 7 6 8.8h20c2.4-1.8 6-4.8 6-8.8 0-5.4-6.8-7.7-12.2-4.1 0-2-1.2-4.6-3.8-4.6z',
-    'M12.5 31.5h20l.9 5h-21.8z',
+    { d: 'M14.8 32.5c1.3-4 2.7-8.4 3.4-12.6h8.6c.7 4.2 2.1 8.6 3.4 12.6z' },
+    { d: 'M15.9 17.5h13.2a1.3 1.3 0 0 1 0 2.6H15.9a1.3 1.3 0 0 1 0-2.6z', trim: true },
+    { d: 'M16.5 17.5c-.7-3.9 1.9-7.1 6-7.1s6.7 3.2 6 7.1z' },
+    { d: 'M21.2 2.6h2.6v2.6h2.5v2.5h-2.5v3h-2.6v-3h-2.5V5.2h2.5z', trim: true },
   ],
 };
 
-// Thin details drawn in the outline color.
+// Thin carved lines and small features, drawn in the outline color.
 const DETAIL: Partial<Record<PieceSymbol, string>> = {
-  b: 'M25 14.5l-4.5 6.5M18.5 27.9h8',
-  n: 'M18.6 14.8h.01',
-  k: 'M19 22.7c1.5 2.5 2.5 5 3.5 8.8 1-3.8 2-6.3 3.5-8.8',
+  b: 'M25 11.6l-4.1 5.6',
+  n: 'M25.6 9.6c3.6 1.6 6 5.2 6.2 10.4M18.6 25.2c-.6-.2-1.3-.4-1.9-.7',
+  r: 'M17.6 21.6h9.8',
+  k: 'M22.5 10.6v6.6',
+};
+
+// Solid dots (knight's eye and nostril).
+const DOTS: Partial<Record<PieceSymbol, string>> = {
+  n: 'M17.9 13.4a1.2 1.1 0 1 1 0 2.2 1.2 1.1 0 0 1 0-2.2zM11.6 20.1a.7.7 0 1 1 0 1.4.7.7 0 0 1 0-1.4z',
 };
 
 export function Piece({ type, color }: { type: PieceSymbol; color: Color }) {
   const side = color === 'w' ? 'white' : 'black';
+  const parts = [...BASE, ...PARTS[type]];
   return (
     <svg className={`piece-svg ${side}`} viewBox="0 0 45 45" aria-hidden>
+      <ellipse className="contact" cx="22.5" cy="40.2" rx="12.5" ry="1.6" />
       <g className="body">
-        {BODY[type].map((d, i) => (
-          <path key={i} d={d} />
+        {parts.map((p, i) => (
+          <path key={i} d={p.d} className={p.trim ? 'trim' : undefined} />
         ))}
-        <path d={BASE} />
       </g>
-      {DETAIL[type] && <path className={type === 'n' ? 'eye' : 'detail'} d={DETAIL[type]} />}
+      {DETAIL[type] && <path className="detail" d={DETAIL[type]} />}
+      {DOTS[type] && <path className="dots" d={DOTS[type]} />}
+      <g className="sheen">
+        {parts.map((p, i) => (
+          <path key={i} d={p.d} />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Shared gradients for every piece. Rendered once near the app root.
+ * Stops read CSS variables, so a theme can recolor pieces without new SVG.
+ */
+export function PieceDefs() {
+  return (
+    <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
+      <defs>
+        {(['w', 'b'] as const).map((c) => (
+          <g key={c}>
+            <linearGradient id={`pg-${c}`} x1="0" y1="0" x2="1" y2="0.25">
+              <stop offset="0" style={{ stopColor: `var(--piece-${c}-hi)` }} />
+              <stop offset="0.45" style={{ stopColor: `var(--piece-${c}-mid)` }} />
+              <stop offset="1" style={{ stopColor: `var(--piece-${c}-lo)` }} />
+            </linearGradient>
+            <linearGradient id={`pt-${c}`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" style={{ stopColor: `var(--piece-${c}-hi)` }} />
+              <stop offset="0.35" style={{ stopColor: `var(--piece-${c}-trim)` }} />
+              <stop offset="1" style={{ stopColor: `var(--piece-${c}-lo)` }} />
+            </linearGradient>
+          </g>
+        ))}
+        {/* Soft top-left light catching the rounded surfaces */}
+        <radialGradient id="p-sheen" cx="0.3" cy="0.25" r="0.75">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.45" />
+          <stop offset="0.5" stopColor="#fff" stopOpacity="0.06" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
     </svg>
   );
 }

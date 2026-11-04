@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import type { Chess, Color, PieceSymbol, Square } from 'chess.js';
 import { Piece, PIECE_NAME } from './pieces';
+import { BoardFX } from './BoardFX';
+import { useTheme } from './themes';
 
 const FILES = 'abcdefgh';
 
@@ -24,7 +26,17 @@ interface Props {
   lastMove: LastMove | null;
   onMove: (from: Square, to: Square, promotion?: PieceSymbol) => void;
   className?: string;
+  /** Arrows drawn over the board, e.g. the coach's suggested move. */
+  arrows?: Arrow[];
+  /** Squares to ring in red (pieces that are under threat). */
+  danger?: Square[];
   children?: React.ReactNode;
+}
+
+export interface Arrow {
+  from: Square;
+  to: Square;
+  kind: 'best' | 'threat';
 }
 
 function toCoords(square: Square, orientation: Color) {
@@ -43,8 +55,26 @@ function toSquare(col: number, row: number, orientation: Color): Square {
   ) as Square;
 }
 
-export function Board({ game, version, orientation, interactiveColor, lastMove, onMove, className, children }: Props) {
+export function Board({
+  game,
+  version,
+  orientation,
+  interactiveColor,
+  lastMove,
+  onMove,
+  className,
+  arrows = [],
+  danger = [],
+  children,
+}: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const { theme, calm } = useTheme();
+  const burstAt = useMemo(() => {
+    if (!lastMove) return null;
+    const { col, row } = toCoords(lastMove.to, orientation);
+    return { x: (col + 0.5) / 8, y: (row + 0.5) / 8, id: lastMove.id };
+  }, [lastMove, orientation]);
+  const fx = theme.fx !== 'none' && <BoardFX kind={theme.fx} calm={calm} burstAt={burstAt} />;
   const [selected, setSelected] = useState<Square | null>(null);
   const [drag, setDrag] = useState<{ square: Square; x: number; y: number } | null>(null);
   const [promo, setPromo] = useState<{ from: Square; to: Square } | null>(null);
@@ -129,6 +159,7 @@ export function Board({ game, version, orientation, interactiveColor, lastMove, 
       if (lastMove && (sq === lastMove.from || sq === lastMove.to)) cls.push('last');
       if (sq === selected) cls.push('selected');
       if (sq === checkSquare) cls.push('check');
+      if (danger.includes(sq)) cls.push('danger');
       const target = targets.get(sq);
       squares.push(
         <div key={sq} className={cls.join(' ')}>
@@ -193,8 +224,43 @@ export function Board({ game, version, orientation, interactiveColor, lastMove, 
       onPointerUp={onPointerUp}
       onContextMenu={(e) => e.preventDefault()}
     >
+      {theme.fxLayer === 'under' && fx}
       <div className="squares">{squares}</div>
       <div className="pieces">{pieces}</div>
+      {theme.fxLayer === 'over' && fx}
+      {arrows.length > 0 && (
+        <svg className="arrows" viewBox="0 0 8 8" aria-hidden>
+          <defs>
+            {(['best', 'threat'] as const).map((k) => (
+              <marker key={k} id={`head-${k}`} markerWidth="3" markerHeight="3" refX="1.2" refY="1.5" orient="auto">
+                <path d="M0 0L3 1.5 0 3z" className={`arrow-head ${k}`} />
+              </marker>
+            ))}
+          </defs>
+          {arrows.map((a, i) => {
+            const f = toCoords(a.from, orientation);
+            const t = toCoords(a.to, orientation);
+            const x1 = f.col + 0.5;
+            const y1 = f.row + 0.5;
+            const len = Math.hypot(t.col - f.col, t.row - f.row);
+            // Stop short so the head lands inside the target square.
+            const k = (len - 0.32) / len;
+            const x2 = x1 + (t.col - f.col) * k;
+            const y2 = y1 + (t.row - f.row) * k;
+            return (
+              <line
+                key={`${a.from}${a.to}${i}`}
+                className={`arrow ${a.kind}`}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                markerEnd={`url(#head-${a.kind})`}
+              />
+            );
+          })}
+        </svg>
+      )}
       {drag && dragPiece && (
         <div
           className={`piece floating ${dragPiece.color === 'w' ? 'white' : 'black'}`}

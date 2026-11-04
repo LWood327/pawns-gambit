@@ -28,7 +28,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 640,
     backgroundColor: '#15302A',
-    title: 'Chess Trainer',
+    title: 'Pawn’s Gambit',
     autoHideMenuBar: true,
     webPreferences: { contextIsolation: true, sandbox: true },
   });

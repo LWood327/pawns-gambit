@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { ThemeContext, getTheme, lavaCracks, loadThemePrefs, saveThemePrefs } from './themes';
 import { flushSync } from 'react-dom';
 import { Home } from './Home';
 import { GameScreen } from './GameScreen';
+import { PieceDefs } from './pieces';
 import { loadMuted, loadSettings, saveMuted, saveSettings, type BotGameSettings } from './settings';
 import { setMuted as setSoundMuted } from './sound';
 
@@ -24,6 +26,23 @@ export default function App() {
     return m;
   });
 
+  const [themePrefs, setThemePrefs] = useState(loadThemePrefs);
+  const themeState = useMemo(
+    () => ({ theme: getTheme(themePrefs.id), calm: themePrefs.calm }),
+    [themePrefs],
+  );
+  useEffect(() => {
+    const root = document.documentElement;
+    if (themeState.theme.id === 'lava' && !root.style.getPropertyValue('--lava-cracks')) {
+      root.style.setProperty('--lava-cracks', lavaCracks());
+    }
+    root.dataset.theme = themeState.theme.id;
+  }, [themeState.theme.id]);
+  const changeTheme = (p: { id: string; calm: boolean }) => {
+    setThemePrefs(p);
+    saveThemePrefs(p);
+  };
+
   const changeSettings = (s: BotGameSettings) => {
     setSettings(s);
     saveSettings(s);
@@ -36,25 +55,28 @@ export default function App() {
     saveMuted(m);
   };
 
-  if (screen.name === 'game') {
-    return (
-      <GameScreen
-        key={screen.key}
-        settings={settings}
-        muted={muted}
-        onToggleMute={toggleMute}
-        onExit={() => transition(() => setScreen({ name: 'home', view: 'bot' }))}
-      />
-    );
-  }
-
   return (
-    <Home
-      key={screen.view}
-      initialView={screen.view}
-      settings={settings}
-      onChangeSettings={changeSettings}
-      onStart={() => transition(() => setScreen({ name: 'game', key: Date.now() }))}
-    />
+    <ThemeContext.Provider value={themeState}>
+      <PieceDefs />
+      {screen.name === 'game' ? (
+        <GameScreen
+          key={screen.key}
+          settings={settings}
+          muted={muted}
+          onToggleMute={toggleMute}
+          onExit={() => transition(() => setScreen({ name: 'home', view: 'bot' }))}
+        />
+      ) : (
+        <Home
+          key={screen.view}
+          initialView={screen.view}
+          settings={settings}
+          onChangeSettings={changeSettings}
+          onStart={() => transition(() => setScreen({ name: 'game', key: Date.now() }))}
+          themePrefs={themePrefs}
+          onChangeTheme={changeTheme}
+        />
+      )}
+    </ThemeContext.Provider>
   );
 }

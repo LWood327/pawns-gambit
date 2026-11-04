@@ -4,5 +4,6 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: './',
   plugins: [react()],
-  server: { port: 5173, strictPort: true },
+  // Polling: the default file watcher misses some edits on Windows.
+  server: { port: 5173, strictPort: true, watch: { usePolling: true, interval: 300 } },
 });

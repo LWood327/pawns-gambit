@@ -1,6 +1,6 @@
 {
-  "name": "chess-trainer",
-  "productName": "Chess Trainer",
+  "name": "pawns-gambit",
+  "productName": "Pawn's Gambit",
   "version": "0.1.0",
   "private": true,
   "main": "electron/main.cjs",

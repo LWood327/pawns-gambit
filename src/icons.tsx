@@ -39,6 +39,13 @@ export const IconFlag = () => (
   </svg>
 );
 
+export const IconEye = () => (
+  <svg {...common}>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
 export const IconSound = ({ muted }: { muted: boolean }) => (
   <svg {...common}>
     <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />

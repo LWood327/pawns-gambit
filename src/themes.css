@@ -1,0 +1,495 @@
+/* ======================= Board themes ======================= */
+/* Each theme overrides the board and piece tokens from styles.css. */
+
+.board-fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  border-radius: 3px;
+}
+
+/* Theme changes cross-fade the board colors */
+.sq,
+.board::before {
+  transition: background-color 400ms ease;
+}
+
+/* ---------- Lava ---------- */
+html[data-theme='lava'] {
+  --lamp: rgba(255, 110, 30, 0.17);
+}
+
+html[data-theme='lava'],
+html[data-theme='lava'] .board {
+  --sq-light: #5e3d2f;
+  --sq-dark: #2b1812;
+  --coord-on-light: #f0a374;
+  --coord-on-dark: #b8704a;
+  --last-move: rgba(255, 140, 40, 0.32);
+  --selected: rgba(255, 170, 60, 0.5);
+  --hint: rgba(255, 150, 60, 0.5);
+  --check: rgba(255, 70, 20, 0.95);
+  --frame: #160b07;
+  --frame-edge: #3a1a0e;
+  --piece-w-hi: #fff4c8;
+  --piece-w-mid: #ffbf5e;
+  --piece-w-trim: #ffd98a;
+  --piece-w-lo: #c25a12;
+  --piece-w-edge: #4a1a05;
+  --piece-b-hi: #5c5a66;
+  --piece-b-mid: #1a181d;
+  --piece-b-trim: #2e2c35;
+  --piece-b-lo: #050407;
+  --piece-b-edge: #ff7a3a;
+}
+
+/* Glowing cracks: turbulence cut into thin bands, tinted orange */
+html[data-theme='lava'] .squares::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='480'%3E%3Cfilter id='v' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='.022' numOctaves='2' seed='11'/%3E%3CfeColorMatrix type='luminanceToAlpha'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='1 .3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'/%3E%3C/feComponentTransfer%3E%3CfeComposite in='SourceGraphic' operator='in'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' fill='%23ff8a24' filter='url(%23v)'/%3E%3C/svg%3E");
+  background-image: var(--lava-cracks, none);
+  background-size: 100% 100%;
+  mix-blend-mode: screen;
+  opacity: 0.8;
+  animation: lava-glow 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes lava-glow {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 0.75;
+  }
+}
+
+html[data-theme='lava'] .board::before {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 140, 60, 0.25),
+    0 0 40px rgba(255, 90, 20, 0.25),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+}
+
+html[data-theme='lava'] .piece-svg.white {
+  filter: drop-shadow(0 0 0.8cqi rgba(255, 150, 40, 0.55));
+}
+
+html[data-theme='lava'] .piece.ghost {
+  animation-name: melt;
+  animation-duration: 520ms;
+}
+
+@keyframes melt {
+  40% {
+    filter: brightness(1.8) sepia(1) saturate(5) hue-rotate(-15deg);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(22%) scaleY(0.12) scaleX(1.25);
+    filter: brightness(2.2) sepia(1) saturate(6) hue-rotate(-20deg);
+  }
+}
+
+/* ---------- Ice ---------- */
+html[data-theme='ice'] {
+  --lamp: rgba(150, 210, 255, 0.15);
+}
+
+html[data-theme='ice'],
+html[data-theme='ice'] .board {
+  --sq-light: #e8f4fb;
+  --sq-dark: #8db7d3;
+  --coord-on-light: #6f9cbb;
+  --coord-on-dark: #f0f9ff;
+  --last-move: rgba(255, 255, 255, 0.5);
+  --selected: rgba(170, 225, 255, 0.7);
+  --hint: rgba(30, 70, 110, 0.3);
+  --frame: #a9cde3;
+  --frame-edge: #eaf7ff;
+  --piece-w-hi: #ffffff;
+  --piece-w-mid: #e9f6ff;
+  --piece-w-trim: #f6fcff;
+  --piece-w-lo: #9cc4de;
+  --piece-w-edge: #2f5f80;
+  --piece-b-hi: #5d86a8;
+  --piece-b-mid: #284763;
+  --piece-b-trim: #37607f;
+  --piece-b-lo: #0b1a29;
+  --piece-b-edge: #cfeaff;
+}
+
+html[data-theme='ice'] .squares::after {
+  background-image:
+    radial-gradient(ellipse at 0 0, rgba(255, 255, 255, 0.55), transparent 35%),
+    radial-gradient(ellipse at 100% 100%, rgba(255, 255, 255, 0.45), transparent 30%),
+    var(--grain);
+  background-size:
+    100% 100%,
+    100% 100%,
+    180px 180px;
+  mix-blend-mode: soft-light;
+  opacity: 0.9;
+}
+
+html[data-theme='ice'] .board::before {
+  background-image: var(--grain), linear-gradient(160deg, var(--frame-edge), var(--frame) 45%, #6f9dbd);
+  background-blend-mode: soft-light, normal;
+}
+
+html[data-theme='ice'] .piece.ghost {
+  animation-name: shatter;
+  animation-duration: 340ms;
+}
+
+@keyframes shatter {
+  to {
+    opacity: 0;
+    transform: scale(1.4);
+    filter: blur(6px) brightness(1.8);
+  }
+}
+
+/* ---------- Deep space ---------- */
+html[data-theme='space'] {
+  --lamp: rgba(150, 110, 255, 0.17);
+}
+
+html[data-theme='space'],
+html[data-theme='space'] .board {
+  --sq-light: rgba(125, 120, 210, 0.36);
+  --sq-dark: rgba(12, 10, 36, 0.5);
+  --coord-on-light: #c9c3ff;
+  --coord-on-dark: #8f88d8;
+  --last-move: rgba(170, 150, 255, 0.38);
+  --selected: rgba(190, 170, 255, 0.55);
+  --hint: rgba(210, 200, 255, 0.4);
+  --check: rgba(255, 90, 140, 0.9);
+  --frame: #0b0a1c;
+  --frame-edge: #2a2550;
+  --piece-w-hi: #ffffff;
+  --piece-w-mid: #e8ebff;
+  --piece-w-trim: #f4f5ff;
+  --piece-w-lo: #8f98d6;
+  --piece-w-edge: #23285a;
+  --piece-b-hi: #7a68c8;
+  --piece-b-mid: #2b2160;
+  --piece-b-trim: #43378a;
+  --piece-b-lo: #07051a;
+  --piece-b-edge: #c8b8ff;
+}
+
+/* Stars are drawn on the effects canvas behind the see-through squares */
+html[data-theme='space'] .board-fx {
+  z-index: 0;
+  background:
+    radial-gradient(circle at 28% 30%, rgba(140, 80, 255, 0.4), transparent 45%),
+    radial-gradient(circle at 76% 72%, rgba(40, 150, 255, 0.32), transparent 50%),
+    radial-gradient(circle at 60% 20%, rgba(255, 90, 180, 0.18), transparent 35%),
+    #06051a;
+}
+
+html[data-theme='space'] .squares::after,
+html[data-theme='neon'] .squares::after {
+  display: none;
+}
+
+html[data-theme='space'] .board::before {
+  background-image: linear-gradient(160deg, var(--frame-edge), var(--frame) 50%);
+  box-shadow:
+    0 0 0 1px rgba(170, 150, 255, 0.25),
+    0 0 50px rgba(120, 90, 255, 0.25),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+}
+
+html[data-theme='space'] .piece-svg {
+  filter: drop-shadow(0 0 0.9cqi rgba(170, 150, 255, 0.55));
+}
+
+html[data-theme='space'] .piece.ghost {
+  animation-name: collapse;
+  animation-duration: 480ms;
+}
+
+@keyframes collapse {
+  to {
+    opacity: 0;
+    transform: scale(0) rotate(220deg);
+    filter: brightness(3);
+  }
+}
+
+/* ---------- Underwater ---------- */
+html[data-theme='reef'] {
+  --lamp: rgba(70, 220, 205, 0.15);
+}
+
+html[data-theme='reef'],
+html[data-theme='reef'] .board {
+  --sq-light: #eadcb3;
+  --sq-dark: #2f7f7a;
+  --coord-on-light: #2f7f7a;
+  --coord-on-dark: #dff3e6;
+  --last-move: rgba(120, 255, 235, 0.35);
+  --selected: rgba(120, 255, 235, 0.55);
+  --hint: rgba(10, 50, 60, 0.32);
+  --frame: #1c4a4f;
+  --frame-edge: #2f6c70;
+  --piece-w-hi: #ffffff;
+  --piece-w-mid: #f6efe6;
+  --piece-w-trim: #fff8ef;
+  --piece-w-lo: #c9b9ab;
+  --piece-w-edge: #33454d;
+  --piece-b-hi: #3f7c86;
+  --piece-b-mid: #123b44;
+  --piece-b-trim: #1d5560;
+  --piece-b-lo: #041519;
+  --piece-b-edge: #bff3ec;
+}
+
+/* Caustics: a net of bright bands drifting across the board in two layers */
+html[data-theme='reef'] .squares::after {
+  --caustic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='c' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='.018' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='luminanceToAlpha'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='1 .2 0 0 0 0 0'/%3E%3C/feComponentTransfer%3E%3CfeComposite in='SourceGraphic' operator='in'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' fill='%23ffffff' filter='url(%23c)'/%3E%3C/svg%3E");
+  background-image: var(--caustic), var(--caustic);
+  background-size:
+    300px 300px,
+    420px 420px;
+  mix-blend-mode: soft-light;
+  opacity: 0.85;
+  animation: caustics 18s linear infinite;
+}
+
+@keyframes caustics {
+  to {
+    background-position:
+      300px 150px,
+      -420px 210px;
+  }
+}
+
+html[data-theme='reef'] .piece.ghost {
+  animation-name: float-away;
+  animation-duration: 600ms;
+}
+
+@keyframes float-away {
+  to {
+    opacity: 0;
+    transform: translateY(-70%) scale(0.75);
+  }
+}
+
+/* ---------- Neon ---------- */
+html[data-theme='neon'] {
+  --lamp: rgba(255, 80, 220, 0.12);
+}
+
+html[data-theme='neon'],
+html[data-theme='neon'] .board {
+  --sq-light: #1b1f3a;
+  --sq-dark: #0d0f1f;
+  --coord-on-light: #7ff7ff;
+  --coord-on-dark: #ff8ee0;
+  --last-move: rgba(127, 247, 255, 0.16);
+  --selected: rgba(255, 95, 210, 0.28);
+  --hint: rgba(127, 247, 255, 0.55);
+  --check: rgba(255, 40, 150, 0.95);
+  --frame: #06070f;
+  --frame-edge: #1b1d33;
+  --piece-w-hi: #e6ffff;
+  --piece-w-mid: #7ff7ff;
+  --piece-w-trim: #b6fbff;
+  --piece-w-lo: #1aa5c2;
+  --piece-w-edge: #003a46;
+  --piece-b-hi: #ffc2f0;
+  --piece-b-mid: #ff5fd2;
+  --piece-b-trim: #ff8ee0;
+  --piece-b-lo: #9a1c86;
+  --piece-b-edge: #3a0030;
+}
+
+html[data-theme='neon'] .sq {
+  box-shadow: inset 0 0 0 0.5px rgba(127, 247, 255, 0.2);
+}
+
+html[data-theme='neon'] .sq.last::after {
+  box-shadow: inset 0 0 1.2cqi rgba(127, 247, 255, 0.55);
+}
+
+html[data-theme='neon'] .board::before {
+  background-image: none;
+  box-shadow:
+    0 0 0 1px rgba(127, 247, 255, 0.45),
+    0 0 24px rgba(127, 247, 255, 0.3),
+    0 0 60px rgba(255, 95, 210, 0.18),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+}
+
+html[data-theme='neon'] .piece-svg.white {
+  filter: drop-shadow(0 0 0.8cqi rgba(127, 247, 255, 0.75));
+}
+
+html[data-theme='neon'] .piece-svg.black {
+  filter: drop-shadow(0 0 0.8cqi rgba(255, 95, 210, 0.75));
+}
+
+html[data-theme='neon'] .piece-svg .sheen {
+  opacity: 0.25;
+}
+
+html[data-theme='neon'] .sq.check::before {
+  animation: neon-check 0.5s steps(2) infinite;
+}
+
+@keyframes neon-check {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+html[data-theme='neon'] .piece.ghost {
+  animation: glitch 360ms steps(6) forwards;
+}
+
+html[data-theme='neon'] .piece.ghost.delayed {
+  animation-delay: 150ms;
+}
+
+@keyframes glitch {
+  20% {
+    transform: translateX(-9%);
+    filter: hue-rotate(90deg);
+  }
+  40% {
+    transform: translateX(7%) skewX(12deg);
+    opacity: 0.7;
+  }
+  60% {
+    transform: translateX(-4%) scaleY(0.6);
+    filter: hue-rotate(200deg);
+  }
+  to {
+    transform: scaleY(0.05) scaleX(1.4);
+    opacity: 0;
+  }
+}
+
+/* ---------- Enchanted forest ---------- */
+html[data-theme='forest'] {
+  --lamp: rgba(190, 255, 110, 0.12);
+}
+
+html[data-theme='forest'],
+html[data-theme='forest'] .board {
+  --sq-light: #ddd2a6;
+  --sq-dark: #556f3c;
+  --coord-on-light: #556f3c;
+  --coord-on-dark: #e8f0c8;
+  --last-move: rgba(220, 255, 120, 0.35);
+  --selected: rgba(220, 255, 120, 0.55);
+  --hint: rgba(30, 40, 15, 0.3);
+  --frame: #2c3a1d;
+  --frame-edge: #445a2c;
+  --piece-w-hi: #ffffff;
+  --piece-w-mid: #f2ead2;
+  --piece-w-trim: #faf4e2;
+  --piece-w-lo: #b8aa82;
+  --piece-w-edge: #3a3020;
+  --piece-b-hi: #6a5536;
+  --piece-b-mid: #2e2416;
+  --piece-b-trim: #45371f;
+  --piece-b-lo: #0e0a05;
+  --piece-b-edge: #d9e8b0;
+}
+
+html[data-theme='forest'] .piece.ghost {
+  animation-name: leaf-fall;
+  animation-duration: 640ms;
+}
+
+@keyframes leaf-fall {
+  to {
+    opacity: 0;
+    transform: translate(28%, 45%) rotate(75deg) scale(0.5);
+  }
+}
+
+/* ---------- Theme gallery ---------- */
+.theme-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-item {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 14px;
+  align-items: center;
+  text-align: left;
+  padding: 8px 12px 8px 8px;
+  border-radius: 12px;
+  transition:
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.theme-item:hover {
+  background: rgba(234, 240, 236, 0.05);
+}
+
+.theme-item[aria-checked='true'] {
+  background: rgba(201, 167, 91, 0.12);
+  box-shadow: inset 0 0 0 2px var(--brass);
+}
+
+.swatch-board {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  padding: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+
+.swatch-board i {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.swatch-board i:nth-of-type(1) {
+  left: 9px;
+  bottom: 9px;
+}
+
+.swatch-board i:nth-of-type(2) {
+  right: 9px;
+  top: 9px;
+}
+
+.theme-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.theme-name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.theme-desc {
+  font-size: 14px;
+  color: var(--chalk-muted);
+}
+
+.themes-view .switch-row {
+  margin-top: 4px;
+}

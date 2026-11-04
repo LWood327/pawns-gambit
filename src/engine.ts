@@ -7,6 +7,14 @@ export interface Strength {
   elo: number;
 }
 
+export interface Analysis {
+  cp: number | null;
+  mate: number | null;
+  best: string;
+  pv: string[];
+  depth: number;
+}
+
 // Stockfish's own rating limiter only goes down to 1320.
 // Below that we use its "Skill Level" setting plus a shallow search instead.
 const STOCKFISH_MIN_ELO = 1320;
@@ -81,6 +89,43 @@ export class Engine {
       this.send(`position fen ${fen}`);
       const line = await this.sendAndWait(go, (l) => l.startsWith('bestmove'));
       return line.split(' ')[1];
+    });
+  }
+
+  /**
+   * Full-strength look at a position. Scores are from the side to move:
+   * positive is good for them. `mate` is moves to mate (negative = getting mated).
+   */
+  analyze(fen: string, movetime = 700, maxDepth = 16): Promise<Analysis> {
+    return this.queue(async () => {
+      await this.ready;
+      this.send('setoption name UCI_LimitStrength value false');
+      this.send('setoption name Skill Level value 20');
+      await this.sendAndWait('isready', (l) => l === 'readyok');
+      this.send(`position fen ${fen}`);
+      let latest: Analysis = { cp: 0, mate: null, best: '', pv: [], depth: 0 };
+      const onInfo: Listener = (line) => {
+        if (!line.startsWith('info') || !line.includes(' pv ') || line.includes('bound')) return;
+        const t = line.split(' ');
+        const at = (k: string) => t.indexOf(k);
+        const depth = Number(t[at('depth') + 1]);
+        const kind = t[at('score') + 1];
+        const value = Number(t[at('score') + 2]);
+        const pv = t.slice(at('pv') + 1);
+        latest = {
+          cp: kind === 'cp' ? value : null,
+          mate: kind === 'mate' ? value : null,
+          best: pv[0],
+          pv,
+          depth,
+        };
+      };
+      this.listeners.add(onInfo);
+      const line = await this.sendAndWait(`go depth ${maxDepth} movetime ${movetime}`, (l) => l.startsWith('bestmove'));
+      this.listeners.delete(onInfo);
+      const best = line.split(' ')[1];
+      if (best && best !== '(none)') latest.best = best;
+      return latest;
     });
   }
 

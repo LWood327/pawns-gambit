@@ -1,4 +1,4 @@
-# Chess Trainer
+# Pawn’s Gambit
 
 A desktop chess app for practicing against Stockfish.
 

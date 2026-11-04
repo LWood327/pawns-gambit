@@ -1,9 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Chess, type Color, type Move, type PieceSymbol, type Square } from 'chess.js';
-import { Board, type LastMove } from './Board';
-import { Engine } from './engine';
+import { Board, type Arrow, type LastMove } from './Board';
+import { Engine, type Analysis } from './engine';
 import { Piece } from './pieces';
-import { IconBack, IconFlag, IconFlip, IconSound, IconUndo } from './icons';
+import { IconBack, IconEye, IconFlag, IconFlip, IconSound, IconUndo } from './icons';
+import {
+  GRADE_LABEL,
+  GRADE_MARK,
+  chances,
+  evalLabel,
+  hangingPieces,
+  review,
+  terminalAnalysis,
+  type Grade,
+  type Review,
+} from './coach';
 import { levelName, timeControl, type BotGameSettings } from './settings';
 import { play } from './sound';
 
@@ -95,6 +106,22 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
   const [engineError, setEngineError] = useState(false);
   const [now, setNow] = useState(() => performance.now());
 
+  // Coach
+  const coachOn = settings.coach;
+  const secondChances = coachOn && settings.secondChances && !timed;
+  const analystRef = useRef<Engine | null>(null);
+  const analysisCache = useRef(new Map<string, Promise<Analysis>>());
+  const [reviews, setReviews] = useState<Record<number, Review>>({});
+  const [latestPly, setLatestPly] = useState<number | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  /** 'prompt' holds the bot back while you decide whether to retry a bad move. */
+  const [gate, setGate] = useState<'none' | 'waiting' | 'prompt'>('none');
+  const [showBest, setShowBest] = useState(false);
+  const [threats, setThreats] = useState(false);
+  /** Engine view from White's side: chance in -1..1 and a short label. */
+  const [evalWhite, setEvalWhite] = useState<{ chance: number; label: string } | null>(null);
+  const [retries, setRetries] = useState(0);
+
   const game = gameRef.current;
   const bump = () => setVersion((v) => v + 1);
   const botColor: Color = player === 'w' ? 'b' : 'w';
@@ -103,11 +130,46 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
   useEffect(() => {
     try {
       engineRef.current = new Engine(() => setEngineError(true));
+      if (coachOn) analystRef.current = new Engine();
     } catch {
       setEngineError(true);
     }
-    return () => engineRef.current?.destroy();
+    return () => {
+      engineRef.current?.destroy();
+      analystRef.current?.destroy();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const analyzeFen = useCallback((fen: string): Promise<Analysis> => {
+    const done = terminalAnalysis(new Chess(fen));
+    if (done) return Promise.resolve(done);
+    let p = analysisCache.current.get(fen);
+    if (!p) {
+      p = analystRef.current ? analystRef.current.analyze(fen) : Promise.reject(new Error('no analyst'));
+      analysisCache.current.set(fen, p);
+    }
+    return p;
+  }, []);
+
+  // Keep the eval bar current.
+  useEffect(() => {
+    if (!coachOn) return;
+    const fen = game.fen();
+    const turn = game.turn();
+    analyzeFen(fen)
+      .then((a) => {
+        if (game.fen() !== fen) return;
+        const sign = turn === 'w' ? 1 : -1;
+        const mated = a.mate !== null && Object.is(a.mate, -0);
+        setEvalWhite({
+          chance: chances(a) * sign,
+          label: mated ? '#' : evalLabel(a.cp === null ? null : a.cp * sign, a.mate === null ? null : a.mate * sign),
+        });
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
 
   /** Bookkeeping after any move: clock, sound, highlight. */
   const afterMove = useCallback(
@@ -145,7 +207,7 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
   // Bot's turn.
   useEffect(() => {
     const engine = engineRef.current;
-    if (!engine || over || game.turn() !== botColor) return;
+    if (!engine || over || game.turn() !== botColor || gate !== 'none') return;
     const id = gameIdRef.current;
     setThinking(true);
     const started = performance.now();
@@ -167,7 +229,7 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
         if (id === gameIdRef.current) setThinking(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version, player, over]);
+  }, [version, player, over, gate]);
 
   // Clock tick.
   const clockRunning = timed && !over && clockRef.current.turnStart !== null;
@@ -205,18 +267,69 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
   }, [now]);
 
 
-  const onMove = useCallback(
-    (from: Square, to: Square, promotion?: PieceSymbol) => {
-      let move: Move;
-      try {
-        move = game.move({ from, to, promotion });
-      } catch {
-        return;
+  /** Grade the move you just played. With second chances on, the bot waits for the verdict. */
+  const coachMove = (fenBefore: string, move: Move) => {
+    const ply = game.history().length - 1;
+    const fenAfter = game.fen();
+    const id = gameIdRef.current;
+    if (secondChances && !game.isGameOver()) setGate('waiting');
+    setReviewing(true);
+    setShowBest(false);
+    Promise.all([analyzeFen(fenBefore), analyzeFen(fenAfter)])
+      .then(([before, after]) => {
+        // Ignore results for a move that has since been taken back.
+        if (id !== gameIdRef.current || game.history()[ply] !== move.san) return;
+        const r = review(fenBefore, fenAfter, move.lan, move.san, before, after, player);
+        setReviews((prev) => ({ ...prev, [ply]: r }));
+        setLatestPly(ply);
+        const bad = r.grade === 'mistake' || r.grade === 'blunder';
+        setGate(secondChances && bad && !game.isGameOver() && game.history().length === ply + 1 ? 'prompt' : 'none');
+      })
+      .catch(() => setGate('none'))
+      .finally(() => {
+        if (id === gameIdRef.current) setReviewing(false);
+      });
+  };
+
+  const onMove = (from: Square, to: Square, promotion?: PieceSymbol) => {
+    const fenBefore = game.fen();
+    let move: Move;
+    try {
+      move = game.move({ from, to, promotion });
+    } catch {
+      return;
+    }
+    if (coachOn) coachMove(fenBefore, move);
+    afterMove(move, false);
+  };
+
+  /** Drop reviews for moves that no longer exist after a take-back. */
+  const pruneReviews = (len: number) => {
+    setReviews((prev) => {
+      const next: Record<number, Review> = {};
+      let last: number | null = null;
+      for (const [k, v] of Object.entries(prev)) {
+        if (Number(k) < len) {
+          next[Number(k)] = v;
+          last = Math.max(last ?? -1, Number(k));
+        }
       }
-      afterMove(move, false);
-    },
-    [game, afterMove],
-  );
+      setLatestPly(last);
+      return next;
+    });
+  };
+
+  const tryAgain = () => {
+    game.undo();
+    pruneReviews(game.history().length);
+    const hist = game.history({ verbose: true });
+    const prev = hist[hist.length - 1];
+    setLastMove(prev ? { from: prev.from, to: prev.to, animate: false, id: ++moveIdRef.current } : null);
+    setRetries((r) => r + 1);
+    setShowBest(false);
+    setGate('none');
+    bump();
+  };
 
   const rematch = () => {
     gameIdRef.current++;
@@ -231,15 +344,27 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
     setLastMove(null);
     setEnding(null);
     setThinking(false);
+    setReviews({});
+    setLatestPly(null);
+    setGate('none');
+    setReviewing(false);
+    setShowBest(false);
+    setEvalWhite(null);
+    setRetries(0);
     bump();
   };
 
   const takeBack = () => {
+    gameIdRef.current++; // drop any review still running
     game.undo();
     if (game.turn() !== player) game.undo();
+    pruneReviews(game.history().length);
     const hist = game.history({ verbose: true });
     const prev = hist[hist.length - 1];
     setLastMove(prev ? { from: prev.from, to: prev.to, animate: false, id: ++moveIdRef.current } : null);
+    setGate('none');
+    setReviewing(false);
+    setShowBest(false);
     bump();
   };
 
@@ -272,11 +397,27 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
   const caps = useMemo(() => captured(game), [game, version]);
   const result = over ? resultText(game, player, ending) : null;
   const playerHasMoved = history.length > (player === 'w' ? 0 : 1);
-  const canTakeBack = !timed && !thinking && ending === null && playerHasMoved;
+  const canTakeBack = !timed && !thinking && ending === null && playerHasMoved && gate !== 'waiting';
+
+  // Coach visuals
+  const latest = latestPly !== null ? reviews[latestPly] : null;
+  const arrows: Arrow[] = [];
+  if (latest && showBest && latest.bestUci) {
+    arrows.push({ from: latest.bestUci.slice(0, 2) as Square, to: latest.bestUci.slice(2, 4) as Square, kind: 'best' });
+  }
+  if (latest?.threatUci && gate === 'prompt') {
+    arrows.push({ from: latest.threatUci.slice(0, 2) as Square, to: latest.threatUci.slice(2, 4) as Square, kind: 'threat' });
+  }
+  const danger = threats && !over && game.turn() === player ? hangingPieces(game, player) : [];
+  const gradeCounts = Object.values(reviews).reduce(
+    (acc, r) => ({ ...acc, [r.grade]: (acc[r.grade] ?? 0) + 1 }),
+    {} as Partial<Record<Grade, number>>,
+  );
 
   let status: string;
   if (engineError) status = 'The bot could not start. Restart the app to try again.';
   else if (result) status = result.detail;
+  else if (gate === 'prompt') status = 'The bot is waiting for you';
   else if (thinking) status = 'The bot is thinking';
   else if (game.inCheck()) status = 'You’re in check';
   else if (timed && clockRef.current.turnStart === null && player === 'w') status = 'Your move. Clocks start after it.';
@@ -333,19 +474,44 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
       <div className="game-body">
         <div className="board-col">
           {plate(botColor, 'Stockfish', `${levelName(settings.elo)}, about ${settings.elo}`)}
+          <div className="board-wrap">
+          {coachOn && (
+            <div className={`evalbar ${orientation === 'b' ? 'flipped' : ''}`} aria-label={`Evaluation ${evalWhite?.label ?? ''}`}>
+              <div className="evalbar-white" style={{ height: `${((evalWhite?.chance ?? 0) + 1) * 50}%` }} />
+              <span className={`evalbar-label ${(evalWhite?.chance ?? 0) >= 0 ? 'w' : 'b'}`}>{evalWhite?.label ?? '0.0'}</span>
+            </div>
+          )}
           <Board
             game={game}
             version={version}
             orientation={orientation}
-            interactiveColor={over || thinking ? null : player}
+            interactiveColor={over || thinking || gate !== 'none' ? null : player}
             lastMove={lastMove}
             onMove={onMove}
             className="main-board"
+            arrows={arrows}
+            danger={danger}
           >
             {result && (
               <div className={`result ${result.won ? 'won' : ''}`}>
                 <h2>{result.title}</h2>
                 <p>{result.detail}</p>
+                {coachOn && Object.keys(reviews).length > 0 && (
+                  <ul className="summary" aria-label="Your moves">
+                    {(['best', 'good', 'inaccuracy', 'mistake', 'blunder'] as Grade[]).map((g) => (
+                      <li key={g} className={g}>
+                        <strong>{gradeCounts[g] ?? 0}</strong>
+                        {GRADE_LABEL[g].replace(' move', '')}
+                      </li>
+                    ))}
+                    {retries > 0 && (
+                      <li className="retries">
+                        <strong>{retries}</strong>
+                        {retries === 1 ? 'Retry' : 'Retries'}
+                      </li>
+                    )}
+                  </ul>
+                )}
                 <div className="result-actions">
                   <button className="primary" onClick={rematch}>
                     Rematch
@@ -357,6 +523,7 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
               </div>
             )}
           </Board>
+          </div>
           {plate(player, 'You', player === 'w' ? 'White' : 'Black')}
         </div>
 
@@ -366,22 +533,82 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
             {status}
           </p>
 
+          {coachOn && (
+            <section className={`coach ${latest ? latest.grade : 'idle'} ${reviewing ? 'busy' : ''}`} aria-live="polite">
+              {latest ? (
+                <>
+                  <div className="coach-head">
+                    <span className="grade-dot" aria-hidden />
+                    <span className="grade-label">{GRADE_LABEL[latest.grade]}</span>
+                    <span className="coach-move">
+                      {latest.playedSan}
+                      {GRADE_MARK[latest.grade] ?? ''}
+                    </span>
+                  </div>
+                  <p className="coach-text">{latest.text}</p>
+                  <div className="coach-actions">
+                    {gate === 'prompt' && (
+                      <>
+                        <button className="primary small" onClick={tryAgain}>
+                          Try again
+                        </button>
+                        <button className="secondary small" onClick={() => setGate('none')}>
+                          Keep my move
+                        </button>
+                      </>
+                    )}
+                    {latest.grade !== 'best' && latest.bestSan && (
+                      <button className="text-btn" onClick={() => setShowBest((s) => !s)}>
+                        {showBest ? 'Hide' : 'Show'} {latest.bestSan}
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="coach-text">
+                  {reviewing ? 'Looking at your move…' : 'Play a move and the coach will grade it here.'}
+                </p>
+              )}
+            </section>
+          )}
+
           <ol className="scoresheet" ref={scoreRef}>
             {rows.length === 0 && <li className="empty">Your moves and the bot’s will be written here.</li>}
-            {rows.map((r, i) => (
-              <li key={r.n} className={i === rows.length - 1 ? 'latest' : ''}>
-                <span className="n">{r.n}</span>
-                <span>{r.w}</span>
-                <span>{r.b ?? ''}</span>
-              </li>
-            ))}
+            {rows.map((r, i) => {
+              const cell = (ply: number, san?: string) => {
+                const rv = reviews[ply];
+                return (
+                  <span className={rv ? `mv ${rv.grade}` : 'mv'}>
+                    {san ?? ''}
+                    {rv && GRADE_MARK[rv.grade] && <sup>{GRADE_MARK[rv.grade]}</sup>}
+                  </span>
+                );
+              };
+              return (
+                <li key={r.n} className={i === rows.length - 1 ? 'latest' : ''}>
+                  <span className="n">{r.n}</span>
+                  {cell(i * 2, r.w)}
+                  {cell(i * 2 + 1, r.b)}
+                </li>
+              );
+            })}
           </ol>
 
-          <div className="tools">
+          <div className={`tools ${coachOn ? 'four' : ''}`}>
             <button onClick={takeBack} disabled={!canTakeBack} title={timed ? 'Not available in timed games' : undefined}>
               <IconUndo />
-              Take back
+              Undo
             </button>
+            {coachOn && (
+              <button
+                onClick={() => setThreats((t) => !t)}
+                aria-pressed={threats}
+                title="Ring your pieces that can be captured"
+              >
+                <IconEye />
+                Threats
+              </button>
+            )}
             <button onClick={() => setOrientation((o) => (o === 'w' ? 'b' : 'w'))}>
               <IconFlip />
               Flip
