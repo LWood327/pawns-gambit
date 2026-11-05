@@ -1,6 +1,6 @@
 // Electron entry point. Serves the built app from a custom "app://" scheme so
 // the Stockfish web worker and its .wasm file load the same way they do in a browser.
-const { app, BrowserWindow, protocol, net } = require('electron');
+const { app, BrowserWindow, protocol, net, ipcMain } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
@@ -32,9 +32,33 @@ function createWindow() {
     backgroundColor: '#15302A',
     title: 'Pawn’s Gambit',
     autoHideMenuBar: true,
-    webPreferences: { contextIsolation: true, sandbox: true },
+    webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname, 'preload.cjs') },
   });
   win.loadURL(isDev ? 'http://localhost:5173' : 'app://chess/index.html');
+  return win;
+}
+
+/**
+ * Checks GitHub releases for a newer version, downloads it in the background,
+ * and tells the page so it can offer a restart. Installed builds only.
+ */
+function setUpUpdates(win) {
+  if (!app.isPackaged) return;
+  const { autoUpdater } = require('electron-updater');
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  const tell = (status) => {
+    if (!win.isDestroyed()) win.webContents.send('update-status', status);
+  };
+  autoUpdater.on('update-available', (info) => tell({ state: 'downloading', version: info.version, percent: 0 }));
+  autoUpdater.on('download-progress', (p) => tell({ state: 'downloading', percent: Math.round(p.percent) }));
+  autoUpdater.on('update-downloaded', (info) => tell({ state: 'ready', version: info.version }));
+  // No internet or no releases yet: stay quiet, try again later.
+  autoUpdater.on('error', (err) => console.warn('Update check failed:', err?.message));
+  ipcMain.on('update-install', () => autoUpdater.quitAndInstall());
+  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+  win.webContents.once('did-finish-load', check);
+  setInterval(check, 4 * 60 * 60 * 1000);
 }
 
 app.whenReady().then(() => {
@@ -48,7 +72,7 @@ app.whenReady().then(() => {
     headers.set('Content-Security-Policy', CSP);
     return new Response(res.body, { status: res.status, headers });
   });
-  createWindow();
+  setUpUpdates(createWindow());
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

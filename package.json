@@ -1,7 +1,7 @@
 {
   "name": "pawns-gambit",
   "productName": "Pawn's Gambit",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A chess app with a live coach, animated board themes and online play with friends.",
   "author": "Logan Woods",
   "license": "GPL-3.0-or-later",
@@ -51,6 +51,17 @@
       "createDesktopShortcut": true,
       "shortcutName": "Pawn's Gambit",
       "artifactName": "Pawns-Gambit-Setup-${version}.exe"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "LWood327",
+        "repo": "pawns-gambit",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   }
 }

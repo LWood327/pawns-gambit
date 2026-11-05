@@ -19,6 +19,7 @@ import {
 import { levelName, timeControl, type BotGameSettings } from './settings';
 import { play } from './sound';
 import { addMistake } from './trainer';
+import { saveGame, type SavedGame } from './games';
 
 const PIECE_VALUE: Record<PieceSymbol, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const START_COUNT: Record<PieceSymbol, number> = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
@@ -85,9 +86,10 @@ interface Props {
   muted: boolean;
   onToggleMute: () => void;
   onExit: () => void;
+  onReview: (g: SavedGame) => void;
 }
 
-export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
+export function GameScreen({ settings, muted, onToggleMute, onExit, onReview }: Props) {
   const tc = timeControl(settings.timeId);
   const timed = tc.base > 0;
 
@@ -402,6 +404,27 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
 
   const caps = useMemo(() => captured(game), [game, version]);
   const result = over ? resultText(game, player, ending) : null;
+
+  // Keep each finished game so it can be reviewed now or later from the Trainer.
+  const [savedGame, setSavedGame] = useState<SavedGame | null>(null);
+  const resultKey = result ? `${result.title}|${history.length}` : '';
+  useEffect(() => {
+    if (!result) {
+      setSavedGame(null);
+      return;
+    }
+    setSavedGame(
+      saveGame({
+        moves: game.history(),
+        player,
+        opponent: `The Pawn Master (${settings.elo})`,
+        mode: 'bot',
+        result: `${result.title}. ${result.detail}`,
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultKey]);
+
   const playerHasMoved = history.length > (player === 'w' ? 0 : 1);
   const canTakeBack = !timed && !thinking && ending === null && playerHasMoved && gate !== 'waiting';
 
@@ -532,6 +555,11 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
                   <button className="primary" onClick={rematch}>
                     Rematch
                   </button>
+                  {savedGame && (
+                    <button className="secondary" onClick={() => onReview(savedGame)}>
+                      Review game
+                    </button>
+                  )}
                   <button className="secondary" onClick={onExit}>
                     Menu
                   </button>

@@ -122,6 +122,8 @@ export function review(
   const keptMate = after.mate !== null && after.mate < 0;
   // Missing a forced mate is at least a mistake if it throws away a clear win.
   if (hadMate && !keptMate && grade !== 'blunder' && pAfter < 0.6) grade = 'mistake';
+  // Still crushing after the move (a slower mate, say)? That's not a mistake.
+  if ((hadMate || pBefore > 0.9) && pAfter >= 0.9 && grade !== 'best' && grade !== 'good') grade = 'good';
 
   let text: string;
   let threatUci: string | undefined;

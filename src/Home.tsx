@@ -8,6 +8,7 @@ import { loadName, saveName, type StartRequest } from './online';
 import { preview as previewSound } from './sound';
 import { OPENINGS, STARTER, duePuzzles, loadBank, loadOpeningStars, nextDueLabel } from './trainer';
 import type { TrainerMode } from './TrainerScreen';
+import { loadGames, type SavedGame } from './games';
 import { LEVELS, TIME_CONTROLS, levelName, timeControl, type BotGameSettings, type SideChoice } from './settings';
 
 // Paul Morphy vs. Duke Karl and Count Isouard, Paris Opera, 1858.
@@ -84,6 +85,7 @@ interface Props {
   onStart: () => void;
   onStartOnline: (r: StartRequest) => void;
   onStartTrainer: (m: TrainerMode) => void;
+  onReview: (g: SavedGame) => void;
   initialView?: 'menu' | 'bot' | 'online' | 'trainer';
   themePrefs: { id: string; calm: boolean };
   onChangeTheme: (p: { id: string; calm: boolean }) => void;
@@ -236,7 +238,16 @@ function OnlineView({ onStart, onBack }: { onStart: (r: StartRequest) => void; o
   );
 }
 
-function TrainerView({ onStart, onBack }: { onStart: (m: TrainerMode) => void; onBack: () => void }) {
+function TrainerView({
+  onStart,
+  onReview,
+  onBack,
+}: {
+  onStart: (m: TrainerMode) => void;
+  onReview: (g: SavedGame) => void;
+  onBack: () => void;
+}) {
+  const recent = loadGames().slice(0, 4);
   const due = duePuzzles().length;
   const total = loadBank().length;
   const stars = loadOpeningStars();
@@ -287,6 +298,23 @@ function TrainerView({ onStart, onBack }: { onStart: (m: TrainerMode) => void; o
           ))}
         </div>
       </fieldset>
+
+      {recent.length > 0 && (
+        <fieldset className="setup-group">
+          <legend>Review a recent game</legend>
+          <div className="recent-list">
+            {recent.map((g) => (
+              <button key={g.id} className="recent-item" onClick={() => onReview(g)}>
+                <span className="recent-who">You vs {g.opponent}</span>
+                <span className="recent-result">{g.result.split('.')[0]}</span>
+                <span className="recent-date">
+                  {new Date(g.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                </span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      )}
     </div>
   );
 }
@@ -297,6 +325,7 @@ export function Home({
   onStart,
   onStartOnline,
   onStartTrainer,
+  onReview,
   initialView = 'menu',
   themePrefs,
   onChangeTheme,
@@ -346,7 +375,7 @@ export function Home({
         ) : view === 'online' ? (
           <OnlineView key="online" onStart={onStartOnline} onBack={() => setView('menu')} />
         ) : view === 'trainer' ? (
-          <TrainerView key="trainer" onStart={onStartTrainer} onBack={() => setView('menu')} />
+          <TrainerView key="trainer" onStart={onStartTrainer} onReview={onReview} onBack={() => setView('menu')} />
         ) : (
           <div className="setup-view" key="bot">
             <button className="text-btn back" onClick={() => setView('menu')}>

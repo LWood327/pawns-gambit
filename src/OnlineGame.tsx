@@ -7,6 +7,7 @@ import { captured, formatClock } from './GameScreen';
 import { OnlineClient, type RoomState, type StartRequest } from './online';
 import { timeControl } from './settings';
 import { play } from './sound';
+import { saveGame, type SavedGame } from './games';
 
 const LOW_TIME = 10_000;
 
@@ -42,9 +43,10 @@ interface Props {
   muted: boolean;
   onToggleMute: () => void;
   onExit: () => void;
+  onReview: (g: SavedGame) => void;
 }
 
-export function OnlineGame({ start, muted, onToggleMute, onExit }: Props) {
+export function OnlineGame({ start, muted, onToggleMute, onExit, onReview }: Props) {
   const clientRef = useRef<OnlineClient | null>(null);
   const [state, setState] = useState<RoomState | null>(null);
   const [receivedAt, setReceivedAt] = useState(0);
@@ -187,6 +189,26 @@ export function OnlineGame({ start, muted, onToggleMute, onExit }: Props) {
 
   const result = state?.result ? resultText(state) : null;
 
+  // Save each finished online game for review.
+  const [savedGame, setSavedGame] = useState<SavedGame | null>(null);
+  const resultKey = state?.result ? `${state.result.kind}|${state.moves.length}|${state.you}` : '';
+  useEffect(() => {
+    if (!state?.result || !result) {
+      setSavedGame(null);
+      return;
+    }
+    setSavedGame(
+      saveGame({
+        moves: state.moves,
+        player: state.you,
+        opponent: state.players[state.you === 'w' ? 'b' : 'w']?.name ?? 'Friend',
+        mode: 'online',
+        result: `${result.title}. ${result.detail}`,
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultKey]);
+
   let status: string;
   if (error?.fatal) status = error.message;
   else if (conn === 'failed') status = 'Can’t reach the game server. Check your internet and try again.';
@@ -303,6 +325,11 @@ export function OnlineGame({ start, muted, onToggleMute, onExit }: Props) {
                   <button className="primary" onClick={() => send({ t: 'rematch' })} disabled={iWantRematch || !opponent?.connected}>
                     {iWantRematch ? 'Waiting for them…' : theyWantRematch ? 'Accept rematch' : 'Rematch'}
                   </button>
+                  {savedGame && (
+                    <button className="secondary" onClick={() => onReview(savedGame)}>
+                      Review game
+                    </button>
+                  )}
                   <button className="secondary" onClick={onExit}>
                     Menu
                   </button>

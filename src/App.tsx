@@ -5,8 +5,11 @@ import { Home } from './Home';
 import { GameScreen } from './GameScreen';
 import { OnlineGame } from './OnlineGame';
 import { TrainerScreen, type TrainerMode } from './TrainerScreen';
+import { ReviewScreen } from './ReviewScreen';
+import type { SavedGame } from './games';
 import type { StartRequest } from './online';
 import { PieceDefs } from './pieces';
+import { UpdateBanner } from './UpdateBanner';
 import { loadMuted, loadSettings, saveMuted, saveSettings, type BotGameSettings } from './settings';
 import { setMuted as setSoundMuted, setSoundTheme } from './sound';
 
@@ -14,6 +17,7 @@ type Screen =
   | { name: 'home'; view: 'menu' | 'bot' | 'online' | 'trainer' }
   | { name: 'game'; key: number }
   | { name: 'trainer'; key: number; mode: TrainerMode }
+  | { name: 'review'; key: number; game: SavedGame; back: 'menu' | 'bot' | 'online' | 'trainer' }
   | { name: 'online'; key: number; start: StartRequest };
 
 /** Animates between screens with the View Transitions API when available. */
@@ -66,6 +70,7 @@ export default function App() {
   return (
     <ThemeContext.Provider value={themeState}>
       <PieceDefs />
+      <UpdateBanner />
       {screen.name === 'game' ? (
         <GameScreen
           key={screen.key}
@@ -73,6 +78,15 @@ export default function App() {
           muted={muted}
           onToggleMute={toggleMute}
           onExit={() => transition(() => setScreen({ name: 'home', view: 'bot' }))}
+          onReview={(game) => transition(() => setScreen({ name: 'review', key: Date.now(), game, back: 'bot' }))}
+        />
+      ) : screen.name === 'review' ? (
+        <ReviewScreen
+          key={screen.key}
+          game={screen.game}
+          muted={muted}
+          onToggleMute={toggleMute}
+          onExit={() => transition(() => setScreen({ name: 'home', view: screen.back }))}
         />
       ) : screen.name === 'trainer' ? (
         <TrainerScreen
@@ -89,6 +103,7 @@ export default function App() {
           muted={muted}
           onToggleMute={toggleMute}
           onExit={() => transition(() => setScreen({ name: 'home', view: 'online' }))}
+          onReview={(game) => transition(() => setScreen({ name: 'review', key: Date.now(), game, back: 'online' }))}
         />
       ) : (
         <Home
@@ -99,6 +114,7 @@ export default function App() {
           onStart={() => transition(() => setScreen({ name: 'game', key: Date.now() }))}
           onStartOnline={(start) => transition(() => setScreen({ name: 'online', key: Date.now(), start }))}
           onStartTrainer={(mode) => transition(() => setScreen({ name: 'trainer', key: Date.now(), mode }))}
+          onReview={(game) => transition(() => setScreen({ name: 'review', key: Date.now(), game, back: 'trainer' }))}
           themePrefs={themePrefs}
           onChangeTheme={changeTheme}
         />
