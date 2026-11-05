@@ -1332,16 +1332,49 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 /* Pieces of yours that can be captured */
-.sq.danger::before {
+/* Threats view: red = yours in danger, green = theirs you can win */
+.sq.danger::before,
+.sq.opportunity::before {
   content: '';
   position: absolute;
-  inset: 6%;
+  inset: 4%;
   border-radius: 50%;
-  box-shadow:
-    inset 0 0 0 max(3px, 0.6cqi) rgba(239, 91, 76, 0.9),
-    0 0 1.2cqi rgba(239, 91, 76, 0.5);
   z-index: 1;
-  animation: fade-in 200ms ease-out;
+  --ring: 239, 70, 55;
+  background: radial-gradient(circle, rgba(var(--ring), 0.32) 40%, rgba(var(--ring), 0) 72%);
+  box-shadow:
+    inset 0 0 0 max(4px, 0.85cqi) rgba(var(--ring), 0.95),
+    0 0 1.6cqi rgba(var(--ring), 0.7);
+  animation: ring-pulse 1.2s ease-in-out infinite alternate;
+}
+
+.sq.opportunity::before {
+  --ring: 90, 220, 140;
+}
+
+@keyframes ring-pulse {
+  from {
+    transform: scale(0.9);
+    opacity: 0.75;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.threat-note {
+  margin: 0;
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(239, 91, 76, 0.12);
+  box-shadow: inset 3px 0 0 #ef5b4c;
+}
+
+.threat-note.ok {
+  background: rgba(90, 220, 140, 0.1);
+  box-shadow: inset 3px 0 0 #5adc8c;
 }
 
 /* Coach card */

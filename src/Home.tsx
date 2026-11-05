@@ -5,6 +5,9 @@ import { Piece } from './pieces';
 import { IconBack } from './icons';
 import { THEMES, type Theme } from './themes';
 import { loadName, saveName, type StartRequest } from './online';
+import { preview as previewSound } from './sound';
+import { OPENINGS, STARTER, duePuzzles, loadBank, loadOpeningStars, nextDueLabel } from './trainer';
+import type { TrainerMode } from './TrainerScreen';
 import { LEVELS, TIME_CONTROLS, levelName, timeControl, type BotGameSettings, type SideChoice } from './settings';
 
 // Paul Morphy vs. Duke Karl and Count Isouard, Paris Opera, 1858.
@@ -80,7 +83,8 @@ interface Props {
   onChangeSettings: (s: BotGameSettings) => void;
   onStart: () => void;
   onStartOnline: (r: StartRequest) => void;
-  initialView?: 'menu' | 'bot' | 'online';
+  onStartTrainer: (m: TrainerMode) => void;
+  initialView?: 'menu' | 'bot' | 'online' | 'trainer';
   themePrefs: { id: string; calm: boolean };
   onChangeTheme: (p: { id: string; calm: boolean }) => void;
 }
@@ -121,7 +125,10 @@ function ThemesView({
             role="radio"
             aria-checked={themePrefs.id === t.id}
             className="theme-item"
-            onClick={() => onChangeTheme({ ...themePrefs, id: t.id })}
+            onClick={() => {
+              onChangeTheme({ ...themePrefs, id: t.id });
+              previewSound(t.id);
+            }}
           >
             <ThemeSwatch t={t} />
             <span className="theme-text">
@@ -229,21 +236,77 @@ function OnlineView({ onStart, onBack }: { onStart: (r: StartRequest) => void; o
   );
 }
 
+function TrainerView({ onStart, onBack }: { onStart: (m: TrainerMode) => void; onBack: () => void }) {
+  const due = duePuzzles().length;
+  const total = loadBank().length;
+  const stars = loadOpeningStars();
+  const later = nextDueLabel();
+
+  return (
+    <div className="setup-view trainer-view">
+      <button className="text-btn back" onClick={onBack}>
+        <IconBack /> Back
+      </button>
+      <h2 className="setup-title">Trainer</h2>
+
+      <div className="trainer-cards">
+        <button className="trainer-card" onClick={() => onStart({ kind: 'mistakes' })} disabled={due === 0}>
+          <span className="trainer-count">{due}</span>
+          <span className="theme-text">
+            <span className="theme-name">Your mistakes</span>
+            <span className="theme-desc">
+              {total === 0
+                ? 'Play coached games against the Pawn Master. Every mistake you make is saved here.'
+                : due > 0
+                  ? `${due} ${due === 1 ? 'puzzle is' : 'puzzles are'} ready from your own games.`
+                  : `All caught up. The next one comes back ${later}.`}
+            </span>
+          </span>
+        </button>
+        <button className="trainer-card" onClick={() => onStart({ kind: 'starter' })}>
+          <span className="trainer-count">{STARTER.length}</span>
+          <span className="theme-text">
+            <span className="theme-name">Checkmate patterns</span>
+            <span className="theme-desc">Classic mates every player should know.</span>
+          </span>
+        </button>
+      </div>
+
+      <fieldset className="setup-group">
+        <legend>Opening practice</legend>
+        <div className="opening-list">
+          {OPENINGS.map((o) => (
+            <button key={o.id} className="opening-item" onClick={() => onStart({ kind: 'opening', id: o.id })} title={o.idea}>
+              <span className="opening-name">{o.name}</span>
+              <span className="opening-side">as {o.side === 'w' ? 'White' : 'Black'}</span>
+              <span className="opening-stars" aria-label={`${stars[o.id] ?? 0} of 3 stars`}>
+                {'★'.repeat(stars[o.id] ?? 0)}
+                <span className="dim">{'★'.repeat(3 - (stars[o.id] ?? 0))}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </fieldset>
+    </div>
+  );
+}
+
 export function Home({
   settings,
   onChangeSettings,
   onStart,
   onStartOnline,
+  onStartTrainer,
   initialView = 'menu',
   themePrefs,
   onChangeTheme,
 }: Props) {
-  const [view, setView] = useState<'menu' | 'bot' | 'themes' | 'online'>(initialView);
+  const [view, setView] = useState<'menu' | 'bot' | 'themes' | 'online' | 'trainer'>(initialView);
 
   const items: MenuItem[] = [
-    { title: 'Play the computer', detail: 'Pick a strength and a clock, then play Stockfish.', onSelect: () => setView('bot') },
+    { title: 'Play the computer', detail: 'Pick a strength and a clock, then take on the Pawn Master.', onSelect: () => setView('bot') },
     { title: 'Play a friend online', detail: 'Share a room code and play from two computers.', onSelect: () => setView('online') },
-    { title: 'Trainer', detail: 'Puzzles from your own mistakes, and opening practice.' },
+    { title: 'Trainer', detail: 'Puzzles from your own mistakes, and opening practice.', onSelect: () => setView('trainer') },
     { title: 'Board themes', detail: 'Lava, ice, deep space and more.', onSelect: () => setView('themes') },
   ];
 
@@ -282,6 +345,8 @@ export function Home({
           <ThemesView key="themes" themePrefs={themePrefs} onChangeTheme={onChangeTheme} onBack={() => setView('menu')} />
         ) : view === 'online' ? (
           <OnlineView key="online" onStart={onStartOnline} onBack={() => setView('menu')} />
+        ) : view === 'trainer' ? (
+          <TrainerView key="trainer" onStart={onStartTrainer} onBack={() => setView('menu')} />
         ) : (
           <div className="setup-view" key="bot">
             <button className="text-btn back" onClick={() => setView('menu')}>
@@ -369,7 +434,7 @@ export function Home({
                   <span>
                     {settings.timeId !== 'none'
                       ? 'Only in games without a clock.'
-                      : 'After a mistake or blunder, try again before the bot replies.'}
+                      : 'After a mistake or blunder, try again before the Pawn Master replies.'}
                   </span>
                 </span>
                 <input

@@ -30,6 +30,8 @@ interface Props {
   arrows?: Arrow[];
   /** Squares to ring in red (pieces that are under threat). */
   danger?: Square[];
+  /** Squares to ring in green (enemy pieces you can win). */
+  opportunity?: Square[];
   children?: React.ReactNode;
 }
 
@@ -65,6 +67,7 @@ export function Board({
   className,
   arrows = [],
   danger = [],
+  opportunity = [],
   children,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -160,6 +163,7 @@ export function Board({
       if (sq === selected) cls.push('selected');
       if (sq === checkSquare) cls.push('check');
       if (danger.includes(sq)) cls.push('danger');
+      if (opportunity.includes(sq)) cls.push('opportunity');
       const target = targets.get(sq);
       squares.push(
         <div key={sq} className={cls.join(' ')}>

@@ -86,10 +86,10 @@ function describeReply(fenAfter: string, replyUci: string, player: Color) {
       .sort((a, b) => VALUE[b.type] - VALUE[a.type])
       .slice(0, 2)
       .map((t) => NAME[t.type]);
-    return `The bot can answer ${move.san}, attacking your ${names[0]} and ${names[1]} at once.`;
+    return `The Pawn Master can answer ${move.san}, attacking your ${names[0]} and ${names[1]} at once.`;
   }
   if (move.captured) {
-    return `This leaves your ${NAME[move.captured]} on ${move.to} open, and the bot can take it with ${move.san}.`;
+    return `This leaves your ${NAME[move.captured]} on ${move.to} open, and the Pawn Master can take it with ${move.san}.`;
   }
   return null;
 }
@@ -131,17 +131,17 @@ export function review(
     grade = 'best';
     text = 'Checkmate. Well played.';
   } else if (grade === 'best') {
-    text = hadMate && before.mate === 1 ? 'You found the checkmate.' : 'That’s the move Stockfish would play.';
+    text = hadMate && before.mate === 1 ? 'You found the checkmate.' : 'That’s the move the Pawn Master would play.';
     if (hadMate && keptMate && before.mate !== 1) text = `You’re on track for checkmate in ${-after.mate!} more.`;
   } else if (grade === 'good') {
-    text = `Solid. Stockfish slightly preferred ${bestSan}.`;
+    text = `Solid. The Pawn Master slightly preferred ${bestSan}.`;
   } else if (allowsMate) {
     threatUci = after.best;
     const reply = uciToSan(fenAfter, after.best);
     text =
       after.mate === 1
-        ? `This lets the bot checkmate you with ${reply}. ${bestSan} would have stopped it.`
-        : `This lets the bot force checkmate in ${after.mate} moves, starting with ${reply}. Try ${bestSan} instead.`;
+        ? `This lets the Pawn Master checkmate you with ${reply}. ${bestSan} would have stopped it.`
+        : `This lets the Pawn Master force checkmate in ${after.mate} moves, starting with ${reply}. Try ${bestSan} instead.`;
   } else if (hadMate && !keptMate) {
     text =
       before.mate === 1
@@ -162,27 +162,37 @@ export function review(
     if (replyNote) text = `${replyNote} A better move was ${bestSan}.`;
     else if (missedCapture) text = missedCapture;
     else if (grade === 'inaccuracy') text = `Not bad, but ${bestSan} was more accurate here.`;
-    else text = `This gives the bot the upper hand. ${bestSan} was the stronger move.`;
+    else text = `This gives the Pawn Master the upper hand. ${bestSan} was the stronger move.`;
   }
 
   return { grade, text, playedSan, bestUci, bestSan, threatUci };
 }
 
-/** Your pieces that can be taken for free or by something cheaper. */
-export function hangingPieces(game: Chess, player: Color): Square[] {
-  const enemy: Color = player === 'w' ? 'b' : 'w';
+/** Pieces of `side` that the other side can take for free or with something cheaper. */
+export function hangingPieces(game: Chess, side: Color): Square[] {
+  const enemy: Color = side === 'w' ? 'b' : 'w';
   const out: Square[] = [];
   for (const row of game.board()) {
     for (const p of row) {
-      if (!p || p.color !== player || p.type === 'k') continue;
-      const attackers = game.attackers(p.square, enemy);
+      if (!p || p.color !== side || p.type === 'k') continue;
+      const defenders = game.attackers(p.square, side);
+      // A king can only take a piece nobody defends.
+      const attackers = game
+        .attackers(p.square, enemy)
+        .filter((s) => game.get(s)!.type !== 'k' || defenders.length === 0);
       if (attackers.length === 0) continue;
-      const defenders = game.attackers(p.square, player);
       const cheapest = Math.min(...attackers.map((s) => VALUE[game.get(s)!.type]));
       if (defenders.length === 0 || cheapest < VALUE[p.type]) out.push(p.square);
     }
   }
   return out;
+}
+
+/** "knight on e5 and bishop on b5" */
+export function describeSquares(game: Chess, squares: Square[]) {
+  const names = squares.map((s) => `${NAME[game.get(s)!.type]} on ${s}`);
+  if (names.length <= 1) return names.join('');
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
 /** Engine score as a short label from White's side, e.g. "+1.4" or "M3". */

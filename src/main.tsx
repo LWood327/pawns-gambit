@@ -5,6 +5,7 @@ import '@fontsource/young-serif/400.css';
 import './styles.css';
 import './themes.css';
 import './online.css';
+import './trainer.css';
 import App from './App';
 import { loadThemePrefs } from './themes';
 

@@ -10,6 +10,7 @@ import {
   chances,
   evalLabel,
   hangingPieces,
+  describeSquares,
   review,
   terminalAnalysis,
   type Grade,
@@ -17,6 +18,7 @@ import {
 } from './coach';
 import { levelName, timeControl, type BotGameSettings } from './settings';
 import { play } from './sound';
+import { addMistake } from './trainer';
 
 const PIECE_VALUE: Record<PieceSymbol, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const START_COUNT: Record<PieceSymbol, number> = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
@@ -52,15 +54,15 @@ type Ending = { kind: 'resign' } | { kind: 'flag'; color: Color } | null;
 
 function resultText(game: Chess, player: Color, ending: Ending) {
   const moves = Math.ceil(game.history().length / 2);
-  if (ending?.kind === 'resign') return { title: 'Resigned', detail: 'The bot takes this one.', won: false };
+  if (ending?.kind === 'resign') return { title: 'Resigned', detail: 'The Pawn Master takes this one.', won: false };
   if (ending?.kind === 'flag') {
     return ending.color === player
-      ? { title: 'Out of time', detail: 'Your clock ran out, so the bot wins.', won: false }
-      : { title: 'Out of time', detail: "The bot's clock ran out. You win.", won: true };
+      ? { title: 'Out of time', detail: 'Your clock ran out, so the Pawn Master wins.', won: false }
+      : { title: 'Out of time', detail: "The Pawn Master's clock ran out. You win.", won: true };
   }
   if (game.isCheckmate()) {
     const won = game.turn() !== player;
-    return { title: 'Checkmate', detail: won ? `You won in ${moves} moves.` : `The bot won in ${moves} moves.`, won };
+    return { title: 'Checkmate', detail: won ? `You won in ${moves} moves.` : `The Pawn Master won in ${moves} moves.`, won };
   }
   if (game.isStalemate()) return { title: 'Stalemate', detail: 'No legal moves and no check, so it’s a draw.', won: false };
   if (game.isThreefoldRepetition()) return { title: 'Draw', detail: 'The same position came up three times.', won: false };
@@ -281,6 +283,10 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
         if (id !== gameIdRef.current || game.history()[ply] !== move.san) return;
         const r = review(fenBefore, fenAfter, move.lan, move.san, before, after, player);
         setReviews((prev) => ({ ...prev, [ply]: r }));
+        // Bad moves come back later as Trainer puzzles.
+        if ((r.grade === 'mistake' || r.grade === 'blunder') && r.bestUci) {
+          addMistake({ fen: fenBefore, best: r.bestUci, bestSan: r.bestSan, played: move.san, grade: r.grade });
+        }
         setLatestPly(ply);
         const bad = r.grade === 'mistake' || r.grade === 'blunder';
         setGate(secondChances && bad && !game.isGameOver() && game.history().length === ply + 1 ? 'prompt' : 'none');
@@ -408,17 +414,26 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
   if (latest?.threatUci && gate === 'prompt') {
     arrows.push({ from: latest.threatUci.slice(0, 2) as Square, to: latest.threatUci.slice(2, 4) as Square, kind: 'threat' });
   }
-  const danger = threats && !over && game.turn() === player ? hangingPieces(game, player) : [];
+  const danger = threats && !over ? hangingPieces(game, player) : [];
+  // Enemy pieces you could win, only useful when it's your move.
+  const opportunity = threats && !over && game.turn() === player ? hangingPieces(game, botColor) : [];
+  let threatNote = '';
+  if (threats && !over) {
+    threatNote = danger.length
+      ? `In danger: your ${describeSquares(game, danger)}.`
+      : 'None of your pieces are in danger right now.';
+    if (opportunity.length) threatNote += ` You can win the ${describeSquares(game, opportunity)}.`;
+  }
   const gradeCounts = Object.values(reviews).reduce(
     (acc, r) => ({ ...acc, [r.grade]: (acc[r.grade] ?? 0) + 1 }),
     {} as Partial<Record<Grade, number>>,
   );
 
   let status: string;
-  if (engineError) status = 'The bot could not start. Restart the app to try again.';
+  if (engineError) status = 'The Pawn Master could not start. Restart the app to try again.';
   else if (result) status = result.detail;
-  else if (gate === 'prompt') status = 'The bot is waiting for you';
-  else if (thinking) status = 'The bot is thinking';
+  else if (gate === 'prompt') status = 'The Pawn Master is waiting for you';
+  else if (thinking) status = 'The Pawn Master is thinking';
   else if (game.inCheck()) status = 'You’re in check';
   else if (timed && clockRef.current.turnStart === null && player === 'w') status = 'Your move. Clocks start after it.';
   else status = 'Your move';
@@ -473,7 +488,7 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
 
       <div className="game-body">
         <div className="board-col">
-          {plate(botColor, 'Stockfish', `${levelName(settings.elo)}, about ${settings.elo}`)}
+          {plate(botColor, 'The Pawn Master', `${levelName(settings.elo)}, about ${settings.elo}`)}
           <div className="board-wrap">
           {coachOn && (
             <div className={`evalbar ${orientation === 'b' ? 'flipped' : ''}`} aria-label={`Evaluation ${evalWhite?.label ?? ''}`}>
@@ -491,6 +506,7 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
             className="main-board"
             arrows={arrows}
             danger={danger}
+            opportunity={opportunity}
           >
             {result && (
               <div className={`result ${result.won ? 'won' : ''}`}>
@@ -572,8 +588,14 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
             </section>
           )}
 
+          {threatNote && (
+            <p className={`threat-note ${danger.length ? 'bad' : 'ok'}`} role="status">
+              {threatNote}
+            </p>
+          )}
+
           <ol className="scoresheet" ref={scoreRef}>
-            {rows.length === 0 && <li className="empty">Your moves and the bot’s will be written here.</li>}
+            {rows.length === 0 && <li className="empty">Your moves and the Pawn Master’s will be written here.</li>}
             {rows.map((r, i) => {
               const cell = (ply: number, san?: string) => {
                 const rv = reviews[ply];
@@ -594,21 +616,19 @@ export function GameScreen({ settings, muted, onToggleMute, onExit }: Props) {
             })}
           </ol>
 
-          <div className={`tools ${coachOn ? 'four' : ''}`}>
+          <div className="tools four">
             <button onClick={takeBack} disabled={!canTakeBack} title={timed ? 'Not available in timed games' : undefined}>
               <IconUndo />
               Undo
             </button>
-            {coachOn && (
-              <button
-                onClick={() => setThreats((t) => !t)}
-                aria-pressed={threats}
-                title="Ring your pieces that can be captured"
-              >
-                <IconEye />
-                Threats
-              </button>
-            )}
+            <button
+              onClick={() => setThreats((t) => !t)}
+              aria-pressed={threats}
+              title="Red rings: your pieces that can be taken. Green rings: pieces you can win."
+            >
+              <IconEye />
+              Threats
+            </button>
             <button onClick={() => setOrientation((o) => (o === 'w' ? 'b' : 'w'))}>
               <IconFlip />
               Flip

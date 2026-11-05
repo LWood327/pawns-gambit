@@ -4,14 +4,16 @@ import { flushSync } from 'react-dom';
 import { Home } from './Home';
 import { GameScreen } from './GameScreen';
 import { OnlineGame } from './OnlineGame';
+import { TrainerScreen, type TrainerMode } from './TrainerScreen';
 import type { StartRequest } from './online';
 import { PieceDefs } from './pieces';
 import { loadMuted, loadSettings, saveMuted, saveSettings, type BotGameSettings } from './settings';
-import { setMuted as setSoundMuted } from './sound';
+import { setMuted as setSoundMuted, setSoundTheme } from './sound';
 
 type Screen =
-  | { name: 'home'; view: 'menu' | 'bot' | 'online' }
+  | { name: 'home'; view: 'menu' | 'bot' | 'online' | 'trainer' }
   | { name: 'game'; key: number }
+  | { name: 'trainer'; key: number; mode: TrainerMode }
   | { name: 'online'; key: number; start: StartRequest };
 
 /** Animates between screens with the View Transitions API when available. */
@@ -42,6 +44,7 @@ export default function App() {
       root.style.setProperty('--lava-cracks', lavaCracks());
     }
     root.dataset.theme = themeState.theme.id;
+    setSoundTheme(themeState.theme.id);
   }, [themeState.theme.id]);
   const changeTheme = (p: { id: string; calm: boolean }) => {
     setThemePrefs(p);
@@ -71,6 +74,14 @@ export default function App() {
           onToggleMute={toggleMute}
           onExit={() => transition(() => setScreen({ name: 'home', view: 'bot' }))}
         />
+      ) : screen.name === 'trainer' ? (
+        <TrainerScreen
+          key={screen.key}
+          mode={screen.mode}
+          muted={muted}
+          onToggleMute={toggleMute}
+          onExit={() => transition(() => setScreen({ name: 'home', view: 'trainer' }))}
+        />
       ) : screen.name === 'online' ? (
         <OnlineGame
           key={screen.key}
@@ -87,6 +98,7 @@ export default function App() {
           onChangeSettings={changeSettings}
           onStart={() => transition(() => setScreen({ name: 'game', key: Date.now() }))}
           onStartOnline={(start) => transition(() => setScreen({ name: 'online', key: Date.now(), start }))}
+          onStartTrainer={(mode) => transition(() => setScreen({ name: 'trainer', key: Date.now(), mode }))}
           themePrefs={themePrefs}
           onChangeTheme={changeTheme}
         />
