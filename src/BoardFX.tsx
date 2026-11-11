@@ -32,6 +32,7 @@ const AMBIENT: Record<FxKind, number> = {
   bubbles: 14,
   sparks: 0,
   fireflies: 14,
+  glitter: 22,
 };
 
 export function BoardFX({ kind, calm, burstAt }: Props) {
@@ -107,6 +108,8 @@ export function BoardFX({ kind, calm, burstAt }: Props) {
           return { x: Math.random() * w, y: h + 8, vx: 0, vy: -(0.3 + Math.random() * 0.5) * s, r: (1.5 + Math.random() * 3.5) * s, max: 900 };
         case 'fireflies':
           return { x: Math.random() * w, y: Math.random() * h, vx: (Math.random() - 0.5) * 0.4 * s, vy: (Math.random() - 0.5) * 0.4 * s, r: (1.4 + Math.random() * 1.4) * s, max: 500 + Math.random() * 400 };
+        case 'glitter':
+          return { x: Math.random() * w, y: Math.random() * h, vx: 0, vy: -(0.05 + Math.random() * 0.15) * s, r: (1.5 + Math.random() * 2.5) * s, max: 90 + Math.random() * 120 };
         default:
           return null;
       }
@@ -222,6 +225,21 @@ export function BoardFX({ kind, calm, burstAt }: Props) {
               ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
               ctx.fill();
             }
+            break;
+          }
+          case 'glitter': {
+            // A four-point twinkle that swells and fades.
+            const tw = p.burst ? 1 : Math.sin((p.life / p.max) * Math.PI);
+            ctx.globalAlpha = Math.max(0, fade * tw);
+            ctx.strokeStyle = p.hue > 0.4 ? 'rgba(255,225,140,1)' : 'rgba(255,248,215,1)';
+            ctx.lineWidth = Math.max(0.6, p.r * 0.35);
+            const len = p.r * (1.2 + tw);
+            ctx.beginPath();
+            ctx.moveTo(p.x - len, p.y);
+            ctx.lineTo(p.x + len, p.y);
+            ctx.moveTo(p.x, p.y - len);
+            ctx.lineTo(p.x, p.y + len);
+            ctx.stroke();
             break;
           }
           case 'sparks':

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ThemeContext, getTheme, lavaCracks, loadThemePrefs, saveThemePrefs } from './themes';
+import { ThemeContext, getTheme, lavaCracks, loadThemePrefs, marbleVeins, saveThemePrefs } from './themes';
 import { flushSync } from 'react-dom';
 import { Home } from './Home';
 import { GameScreen } from './GameScreen';
 import { OnlineGame } from './OnlineGame';
 import { TrainerScreen, type TrainerMode } from './TrainerScreen';
 import { ReviewScreen } from './ReviewScreen';
+import { ProgressScreen } from './ProgressScreen';
+import type { Boss } from './ladder';
 import type { SavedGame } from './games';
 import type { StartRequest } from './online';
 import { PieceDefs } from './pieces';
@@ -13,11 +15,14 @@ import { UpdateBanner } from './UpdateBanner';
 import { loadMuted, loadSettings, saveMuted, saveSettings, type BotGameSettings } from './settings';
 import { setMuted as setSoundMuted, setSoundTheme } from './sound';
 
+type HomeView = 'menu' | 'bot' | 'online' | 'trainer' | 'ladder';
+
 type Screen =
-  | { name: 'home'; view: 'menu' | 'bot' | 'online' | 'trainer' }
-  | { name: 'game'; key: number }
-  | { name: 'trainer'; key: number; mode: TrainerMode }
-  | { name: 'review'; key: number; game: SavedGame; back: 'menu' | 'bot' | 'online' | 'trainer' }
+  | { name: 'home'; view: HomeView }
+  | { name: 'game'; key: number; boss?: Boss }
+  | { name: 'trainer'; key: number; mode: TrainerMode; back: HomeView }
+  | { name: 'review'; key: number; game: SavedGame; back: HomeView | 'progress' }
+  | { name: 'progress'; key: number }
   | { name: 'online'; key: number; start: StartRequest };
 
 /** Animates between screens with the View Transitions API when available. */
@@ -47,6 +52,9 @@ export default function App() {
     if (themeState.theme.id === 'lava' && !root.style.getPropertyValue('--lava-cracks')) {
       root.style.setProperty('--lava-cracks', lavaCracks());
     }
+    if (themeState.theme.id === 'marble' && !root.style.getPropertyValue('--marble-veins')) {
+      root.style.setProperty('--marble-veins', marbleVeins());
+    }
     root.dataset.theme = themeState.theme.id;
     setSoundTheme(themeState.theme.id);
   }, [themeState.theme.id]);
@@ -75,10 +83,20 @@ export default function App() {
         <GameScreen
           key={screen.key}
           settings={settings}
+          boss={screen.boss}
           muted={muted}
           onToggleMute={toggleMute}
-          onExit={() => transition(() => setScreen({ name: 'home', view: 'bot' }))}
-          onReview={(game) => transition(() => setScreen({ name: 'review', key: Date.now(), game, back: 'bot' }))}
+          onExit={() => transition(() => setScreen({ name: 'home', view: screen.boss ? 'ladder' : 'bot' }))}
+          onReview={(game) =>
+            transition(() => setScreen({ name: 'review', key: Date.now(), game, back: screen.boss ? 'ladder' : 'bot' }))
+          }
+          onNextRank={(boss) => transition(() => setScreen({ name: 'game', key: Date.now(), boss }))}
+        />
+      ) : screen.name === 'progress' ? (
+        <ProgressScreen
+          key={screen.key}
+          onExit={() => transition(() => setScreen({ name: 'home', view: 'menu' }))}
+          onReview={(game) => transition(() => setScreen({ name: 'review', key: Date.now(), game, back: 'progress' }))}
         />
       ) : screen.name === 'review' ? (
         <ReviewScreen
@@ -86,7 +104,11 @@ export default function App() {
           game={screen.game}
           muted={muted}
           onToggleMute={toggleMute}
-          onExit={() => transition(() => setScreen({ name: 'home', view: screen.back }))}
+          onExit={() =>
+            transition(() =>
+              setScreen(screen.back === 'progress' ? { name: 'progress', key: Date.now() } : { name: 'home', view: screen.back }),
+            )
+          }
         />
       ) : screen.name === 'trainer' ? (
         <TrainerScreen
@@ -94,7 +116,7 @@ export default function App() {
           mode={screen.mode}
           muted={muted}
           onToggleMute={toggleMute}
-          onExit={() => transition(() => setScreen({ name: 'home', view: 'trainer' }))}
+          onExit={() => transition(() => setScreen({ name: 'home', view: screen.back }))}
         />
       ) : screen.name === 'online' ? (
         <OnlineGame
@@ -113,7 +135,10 @@ export default function App() {
           onChangeSettings={changeSettings}
           onStart={() => transition(() => setScreen({ name: 'game', key: Date.now() }))}
           onStartOnline={(start) => transition(() => setScreen({ name: 'online', key: Date.now(), start }))}
-          onStartTrainer={(mode) => transition(() => setScreen({ name: 'trainer', key: Date.now(), mode }))}
+          onStartTrainer={(mode) => transition(() => setScreen({ name: 'trainer', key: Date.now(), mode, back: 'trainer' }))}
+          onStartLadder={(boss) => transition(() => setScreen({ name: 'game', key: Date.now(), boss }))}
+          onOpenProgress={() => transition(() => setScreen({ name: 'progress', key: Date.now() }))}
+          onDaily={() => transition(() => setScreen({ name: 'trainer', key: Date.now(), mode: { kind: 'daily' }, back: 'menu' }))}
           onReview={(game) => transition(() => setScreen({ name: 'review', key: Date.now(), game, back: 'trainer' }))}
           themePrefs={themePrefs}
           onChangeTheme={changeTheme}

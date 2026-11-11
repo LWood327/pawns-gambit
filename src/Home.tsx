@@ -3,12 +3,15 @@ import { Chess } from 'chess.js';
 import { Board, type LastMove } from './Board';
 import { Piece } from './pieces';
 import { IconBack } from './icons';
-import { THEMES, type Theme } from './themes';
+import { THEMES, getTheme, type Theme } from './themes';
 import { loadName, saveName, type StartRequest } from './online';
 import { preview as previewSound } from './sound';
 import { OPENINGS, STARTER, duePuzzles, loadBank, loadOpeningStars, nextDueLabel } from './trainer';
 import type { TrainerMode } from './TrainerScreen';
 import { loadGames, type SavedGame } from './games';
+import { BOSSES, isUnlocked, loadLadder, unlockedRewards, type Boss } from './ladder';
+import { PERSONALITY_HINT, PERSONALITY_LABEL } from './personality';
+import { dailyStatus, todaysPuzzle } from './daily';
 import { LEVELS, TIME_CONTROLS, levelName, timeControl, type BotGameSettings, type SideChoice } from './settings';
 
 // Paul Morphy vs. Duke Karl and Count Isouard, Paris Opera, 1858.
@@ -85,8 +88,11 @@ interface Props {
   onStart: () => void;
   onStartOnline: (r: StartRequest) => void;
   onStartTrainer: (m: TrainerMode) => void;
+  onStartLadder: (b: Boss) => void;
+  onOpenProgress: () => void;
+  onDaily: () => void;
   onReview: (g: SavedGame) => void;
-  initialView?: 'menu' | 'bot' | 'online' | 'trainer';
+  initialView?: 'menu' | 'bot' | 'online' | 'trainer' | 'ladder';
   themePrefs: { id: string; calm: boolean };
   onChangeTheme: (p: { id: string; calm: boolean }) => void;
 }
@@ -114,6 +120,7 @@ function ThemesView({
   onChangeTheme: Props['onChangeTheme'];
   onBack: () => void;
 }) {
+  const won = unlockedRewards();
   return (
     <div className="setup-view themes-view">
       <button className="text-btn back" onClick={onBack}>
@@ -121,24 +128,31 @@ function ThemesView({
       </button>
       <h2 className="setup-title">Board themes</h2>
       <div className="theme-list" role="radiogroup" aria-label="Board theme">
-        {THEMES.map((t) => (
-          <button
-            key={t.id}
-            role="radio"
-            aria-checked={themePrefs.id === t.id}
-            className="theme-item"
-            onClick={() => {
-              onChangeTheme({ ...themePrefs, id: t.id });
-              previewSound(t.id);
-            }}
-          >
-            <ThemeSwatch t={t} />
-            <span className="theme-text">
-              <span className="theme-name">{t.name}</span>
-              <span className="theme-desc">{t.description}</span>
-            </span>
-          </button>
-        ))}
+        {THEMES.map((t) => {
+          const locked = t.unlockRank !== undefined && !won.includes(t.id);
+          return (
+            <button
+              key={t.id}
+              role="radio"
+              aria-checked={themePrefs.id === t.id}
+              className="theme-item"
+              disabled={locked}
+              onClick={() => {
+                onChangeTheme({ ...themePrefs, id: t.id });
+                previewSound(t.id);
+              }}
+            >
+              <ThemeSwatch t={t} />
+              <span className="theme-text">
+                <span className="theme-name">
+                  {t.name}
+                  {locked && <span className="theme-lock">Beat rank {t.unlockRank} to unlock</span>}
+                </span>
+                <span className="theme-desc">{t.description}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
       <label className="switch-row">
         <span>
@@ -238,6 +252,54 @@ function OnlineView({ onStart, onBack }: { onStart: (r: StartRequest) => void; o
   );
 }
 
+function LadderView({ onStart, onBack }: { onStart: (b: Boss) => void; onBack: () => void }) {
+  const progress = loadLadder();
+  const done = progress.beaten.length;
+  return (
+    <div className="setup-view ladder-view">
+      <button className="text-btn back" onClick={onBack}>
+        <IconBack /> Back
+      </button>
+      <h2 className="setup-title">Climb the ranks</h2>
+      <p className="hint-text ladder-intro">
+        Beat each opponent to move up a rank. Reach the eighth rank to face the Pawn Master. Ladder games are played
+        without a clock, coach or undo, and colors are drawn at random.
+      </p>
+      <ol className="ladder" aria-label={`Ladder, ${done} of 8 beaten`}>
+        {[...BOSSES].reverse().map((b) => {
+          const beaten = progress.beaten.includes(b.rank);
+          const open = isUnlocked(b.rank, progress);
+          const tries = progress.tries[b.rank] ?? 0;
+          return (
+            <li key={b.rank}>
+              <button
+                className={`rung ${beaten ? 'beaten' : open ? 'open' : 'locked'}`}
+                disabled={!open}
+                onClick={() => onStart(b)}
+                title={open ? PERSONALITY_HINT[b.style] : `Beat rank ${b.rank - 1} first`}
+              >
+                <span className="rung-rank">{b.rank}</span>
+                <span className="rung-who">
+                  <span className="rung-name">{b.name}</span>
+                  <span className="rung-blurb">{open ? b.blurb : 'Locked'}</span>
+                </span>
+                <span className="rung-meta">
+                  <span>{PERSONALITY_LABEL[b.style]}</span>
+                  <span>about {b.elo}</span>
+                </span>
+                <span className="rung-status">
+                  {beaten ? '✓ Beaten' : open ? (tries ? `Try ${tries + 1}` : 'Play') : '🔒'}
+                </span>
+                {b.reward && <span className="rung-prize">Prize: {getTheme(b.reward).name} theme</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 function TrainerView({
   onStart,
   onReview,
@@ -325,17 +387,30 @@ export function Home({
   onStart,
   onStartOnline,
   onStartTrainer,
+  onStartLadder,
+  onOpenProgress,
+  onDaily,
   onReview,
   initialView = 'menu',
   themePrefs,
   onChangeTheme,
 }: Props) {
-  const [view, setView] = useState<'menu' | 'bot' | 'themes' | 'online' | 'trainer'>(initialView);
+  const [view, setView] = useState<'menu' | 'bot' | 'themes' | 'online' | 'trainer' | 'ladder'>(initialView);
+
+  const ladder = loadLadder();
+  const daily = dailyStatus();
+  const ladderRank = ladder.beaten.length >= 8 ? 9 : BOSSES.find((b) => !ladder.beaten.includes(b.rank))!.rank;
 
   const items: MenuItem[] = [
     { title: 'Play the computer', detail: 'Pick a strength and a clock, then take on the Pawn Master.', onSelect: () => setView('bot') },
+    {
+      title: 'Climb the ranks',
+      detail: ladderRank > 8 ? 'All eight ranks conquered. Replay any opponent.' : `Eight opponents, one per rank. You’re on rank ${ladderRank}.`,
+      onSelect: () => setView('ladder'),
+    },
     { title: 'Play a friend online', detail: 'Share a room code and play from two computers.', onSelect: () => setView('online') },
     { title: 'Trainer', detail: 'Puzzles from your own mistakes, and opening practice.', onSelect: () => setView('trainer') },
+    { title: 'Your progress', detail: 'Your rating, accuracy and record over time.', onSelect: onOpenProgress },
     { title: 'Board themes', detail: 'Lava, ice, deep space and more.', onSelect: () => setView('themes') },
   ];
 
@@ -372,11 +447,29 @@ export function Home({
                 </button>
               ))}
             </nav>
+            <button className={`daily-card ${daily.solvedToday ? 'done' : ''}`} onClick={onDaily}>
+              <span className="daily-streak" aria-hidden>
+                {daily.streak > 0 ? '🔥' : '♟'}
+                {daily.streak > 0 && <strong>{daily.streak}</strong>}
+              </span>
+              <span className="daily-text">
+                <span className="daily-title">Daily puzzle #{todaysPuzzle().number}</span>
+                <span className="daily-sub">
+                  {daily.solvedToday
+                    ? 'Solved today. Back tomorrow for a new one.'
+                    : daily.streak > 0
+                      ? `Solve it to keep your ${daily.streak}-day streak.`
+                      : 'One new puzzle a day, the same for everyone.'}
+                </span>
+              </span>
+            </button>
           </div>
         ) : view === 'themes' ? (
           <ThemesView key="themes" themePrefs={themePrefs} onChangeTheme={onChangeTheme} onBack={() => setView('menu')} />
         ) : view === 'online' ? (
           <OnlineView key="online" onStart={onStartOnline} onBack={() => setView('menu')} />
+        ) : view === 'ladder' ? (
+          <LadderView key="ladder" onStart={onStartLadder} onBack={() => setView('menu')} />
         ) : view === 'trainer' ? (
           <TrainerView key="trainer" onStart={onStartTrainer} onReview={onReview} onBack={() => setView('menu')} />
         ) : (

@@ -22,6 +22,8 @@ const TIME_CONTROLS = {
   30: { base: 30 * MIN, increment: 0 },
 };
 
+const REACTIONS = ['👍', '😮', '😂', '🔥', '😬', '👏', '🤝', '😭'];
+
 const WORDS = ['KNIGHT', 'ROOK', 'BISHOP', 'PAWN', 'QUEEN', 'KING', 'CASTLE', 'GAMBIT', 'FORK', 'CHECK', 'BOARD', 'SQUARE'];
 
 /** @type {Map<string, Room>} */
@@ -267,6 +269,19 @@ function handle(ws, msg) {
         room.newGame();
       }
       room.broadcast();
+      return;
+    }
+    case 'react': {
+      // Quick emoji reactions: a fixed set, and at most 4 every 5 seconds.
+      if (!REACTIONS.includes(msg.emoji)) return;
+      const now = Date.now();
+      ws.reacts = (ws.reacts ?? []).filter((t) => now - t < 5000);
+      if (ws.reacts.length >= 4) return;
+      ws.reacts.push(now);
+      for (const c of ['w', 'b']) {
+        const s = room.seats[c];
+        if (s?.ws) send(s.ws, { t: 'reaction', from: color, emoji: msg.emoji });
+      }
       return;
     }
     case 'chat': {

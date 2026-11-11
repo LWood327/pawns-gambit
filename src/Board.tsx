@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import type { Chess, Color, PieceSymbol, Square } from 'chess.js';
+import { Chess as ChessCtor, type Chess, type Color, type PieceSymbol, type Square } from 'chess.js';
 import { Piece, PIECE_NAME } from './pieces';
 import { BoardFX } from './BoardFX';
 import { useTheme } from './themes';
@@ -32,7 +32,25 @@ interface Props {
   danger?: Square[];
   /** Squares to ring in green (enemy pieces you can win). */
   opportunity?: Square[];
+  /** Premoves: while it's the other side's turn, this color may queue a move. */
+  premoveColor?: Color | null;
+  onPremove?: (from: Square, to: Square, promotion?: PieceSymbol) => void;
+  onCancelPremove?: () => void;
+  /** The queued premove, highlighted on the board. */
+  premove?: { from: Square; to: Square } | null;
   children?: React.ReactNode;
+}
+
+/** Moves a side could make if it were their turn (for premoves; ignores checks). */
+function movesAsIfTurn(game: Chess, color: Color, square: Square) {
+  const parts = game.fen().split(' ');
+  parts[1] = color;
+  parts[3] = '-';
+  try {
+    return new ChessCtor(parts.join(' ')).moves({ square, verbose: true });
+  } catch {
+    return [];
+  }
 }
 
 export interface Arrow {
@@ -68,8 +86,14 @@ export function Board({
   arrows = [],
   danger = [],
   opportunity = [],
+  premoveColor = null,
+  onPremove,
+  onCancelPremove,
+  premove = null,
   children,
 }: Props) {
+  const premoveMode = !interactiveColor && Boolean(premoveColor) && game.turn() !== premoveColor && !game.isGameOver();
+  const activeColor: Color | null = interactiveColor ?? (premoveMode ? premoveColor : null);
   const ref = useRef<HTMLDivElement>(null);
   const { theme, calm } = useTheme();
   const burstAt = useMemo(() => {
@@ -87,10 +111,10 @@ export function Board({
 
   const targets = useMemo(() => {
     if (!selected) return new Map<Square, boolean>();
-    const moves = game.moves({ square: selected, verbose: true });
+    const moves = premoveMode && premoveColor ? movesAsIfTurn(game, premoveColor, selected) : game.moves({ square: selected, verbose: true });
     return new Map(moves.map((m) => [m.to as Square, Boolean(m.captured)]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, selected, version]);
+  }, [game, selected, version, premoveMode]);
 
   const checkSquare = useMemo(() => {
     if (!game.inCheck()) return null;
@@ -109,14 +133,17 @@ export function Board({
 
   const isOwnPiece = (sq: Square) => {
     const p = game.get(sq);
-    return Boolean(p && interactiveColor && p.color === interactiveColor && game.turn() === interactiveColor);
+    return Boolean(p && activeColor && p.color === activeColor && (premoveMode || game.turn() === activeColor));
   };
 
   const tryMove = (from: Square, to: Square) => {
     if (!targets.has(to)) return false;
     const piece = game.get(from);
     const lastRank = to[1] === '8' || to[1] === '1';
-    if (piece?.type === 'p' && lastRank) {
+    if (premoveMode) {
+      // Premoves promote to a queen automatically.
+      onPremove?.(from, to, piece?.type === 'p' && lastRank ? 'q' : undefined);
+    } else if (piece?.type === 'p' && lastRank) {
       setPromo({ from, to });
     } else {
       onMove(from, to);
@@ -164,6 +191,7 @@ export function Board({
       if (sq === checkSquare) cls.push('check');
       if (danger.includes(sq)) cls.push('danger');
       if (opportunity.includes(sq)) cls.push('opportunity');
+      if (premove && (sq === premove.from || sq === premove.to)) cls.push('premove');
       const target = targets.get(sq);
       squares.push(
         <div key={sq} className={cls.join(' ')}>
@@ -226,7 +254,11 @@ export function Board({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setSelected(null);
+        onCancelPremove?.();
+      }}
     >
       {theme.fxLayer === 'under' && fx}
       <div className="squares">{squares}</div>

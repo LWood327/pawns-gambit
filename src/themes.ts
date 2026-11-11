@@ -3,7 +3,7 @@
 
 import { createContext, useContext } from 'react';
 
-export type FxKind = 'none' | 'embers' | 'snow' | 'stars' | 'bubbles' | 'sparks' | 'fireflies';
+export type FxKind = 'none' | 'embers' | 'snow' | 'stars' | 'bubbles' | 'sparks' | 'fireflies' | 'glitter';
 
 export interface Theme {
   id: string;
@@ -13,6 +13,8 @@ export interface Theme {
   /** 'under' draws effects behind see-through squares; 'over' floats them above the pieces. */
   fxLayer: 'under' | 'over';
   swatch: { light: string; dark: string; frame: string; white: string; black: string };
+  /** Locked until this ladder rank is beaten. */
+  unlockRank?: number;
 }
 
 export const THEMES: Theme[] = [
@@ -72,24 +74,37 @@ export const THEMES: Theme[] = [
     fxLayer: 'over',
     swatch: { light: '#ddd2a6', dark: '#556f3c', frame: '#2c3a1d', white: '#f6f0dc', black: '#2e2416' },
   },
+  {
+    id: 'marble',
+    name: 'Marble hall',
+    description: 'Polished stone with fine veins. Won by beating The Jester on the ladder.',
+    fx: 'none',
+    fxLayer: 'over',
+    swatch: { light: '#eeebe4', dark: '#6d7a78', frame: '#2c3133', white: '#fbf9f4', black: '#22282a' },
+    unlockRank: 4,
+  },
+  {
+    id: 'crown',
+    name: 'Crown',
+    description: 'Gold and royal purple, sprinkled with glitter. Won by reaching the eighth rank.',
+    fx: 'glitter',
+    fxLayer: 'over',
+    swatch: { light: '#ead39b', dark: '#5b2a6e', frame: '#8a6420', white: '#fff1bf', black: '#2a1236' },
+    unlockRank: 8,
+  },
 ];
 
-/**
- * Cooled-lava crust: glowing cracks along the edges between random cells.
- * Built once at runtime (about 50ms) and cached as an image URL.
- */
-let lavaUrl: string | null = null;
-export function lavaCracks(): string {
-  if (lavaUrl) return lavaUrl;
+/** Board-wide texture of cell edges (like cracked crust or stone veins), drawn once. */
+function cellTexture(seedStart: number, count: number, paint: (edge: number) => [number, number, number, number]) {
   const size = 512;
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d')!;
   const img = ctx.createImageData(size, size);
   // Seeded random so the board looks the same every time.
-  let seed = 42;
+  let seed = seedStart;
   const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const pts = Array.from({ length: 46 }, () => [rand() * size, rand() * size]);
+  const pts = Array.from({ length: count }, () => [rand() * size, rand() * size]);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       let d1 = Infinity;
@@ -104,19 +119,40 @@ export function lavaCracks(): string {
           d1 = d;
         } else if (d < d2) d2 = d;
       }
-      const edge = Math.sqrt(d2) - Math.sqrt(d1); // 0 on a crack
-      const core = Math.max(0, 1 - edge / 1.6);
-      const glow = Math.exp(-edge / 5) * 0.32;
-      const a = Math.min(1, Math.max(core, glow));
+      const [r, g, b, a] = paint(Math.sqrt(d2) - Math.sqrt(d1));
       const i = (y * size + x) * 4;
-      img.data[i] = 255;
-      img.data[i + 1] = 110 + 120 * core;
-      img.data[i + 2] = 30 + 90 * core;
-      img.data[i + 3] = a * 255;
+      img.data[i] = r;
+      img.data[i + 1] = g;
+      img.data[i + 2] = b;
+      img.data[i + 3] = a;
     }
   }
   ctx.putImageData(img, 0, 0);
-  lavaUrl = `url(${c.toDataURL('image/png')})`;
+  return `url(${c.toDataURL('image/png')})`;
+}
+
+let marbleUrl: string | null = null;
+/** Fine grey veins for the Marble hall theme. */
+export function marbleVeins(): string {
+  marbleUrl ??= cellTexture(7, 18, (edge) => {
+    const core = Math.max(0, 1 - edge / 1.1);
+    const haze = Math.exp(-edge / 10) * 0.22;
+    return [70, 74, 76, Math.min(1, Math.max(core * 0.8, haze)) * 255];
+  });
+  return marbleUrl;
+}
+
+/**
+ * Cooled-lava crust: glowing cracks along the edges between random cells.
+ * Built once at runtime (about 50ms) and cached as an image URL.
+ */
+let lavaUrl: string | null = null;
+export function lavaCracks(): string {
+  lavaUrl ??= cellTexture(42, 46, (edge) => {
+    const core = Math.max(0, 1 - edge / 1.6);
+    const glow = Math.exp(-edge / 5) * 0.32;
+    return [255, 110 + 120 * core, 30 + 90 * core, Math.min(1, Math.max(core, glow)) * 255];
+  });
   return lavaUrl;
 }
 

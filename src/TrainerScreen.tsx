@@ -5,6 +5,7 @@ import { Engine, type Analysis } from './engine';
 import { IconBack, IconSound } from './icons';
 import { chances, review } from './coach';
 import { play } from './sound';
+import { dailyStatus, recordDaily, todaysPuzzle } from './daily';
 import {
   OPENINGS,
   STARTER,
@@ -14,7 +15,7 @@ import {
   type Puzzle,
 } from './trainer';
 
-export type TrainerMode = { kind: 'mistakes' } | { kind: 'starter' } | { kind: 'opening'; id: string };
+export type TrainerMode = { kind: 'mistakes' } | { kind: 'starter' } | { kind: 'daily' } | { kind: 'opening'; id: string };
 
 interface Props {
   mode: TrainerMode;
@@ -38,6 +39,7 @@ function moveSound(game: Chess, captured?: boolean) {
 
 function Shell({
   title,
+  backLabel = 'Trainer',
   muted,
   onToggleMute,
   onExit,
@@ -45,6 +47,7 @@ function Shell({
   side,
 }: {
   title: string;
+  backLabel?: string;
   muted: boolean;
   onToggleMute: () => void;
   onExit: () => void;
@@ -55,7 +58,7 @@ function Shell({
     <div className="game-screen trainer-screen">
       <header className="topbar">
         <button className="text-btn" onClick={onExit}>
-          <IconBack /> Trainer
+          <IconBack /> {backLabel}
         </button>
         <span className="topbar-title">{title}</span>
         <button className="icon-btn" onClick={onToggleMute} aria-label={muted ? 'Turn sound on' : 'Turn sound off'}>
@@ -72,8 +75,12 @@ function Shell({
 
 /* ======================= Puzzles ======================= */
 
-function PuzzleSession({ source, ...shell }: { source: 'mistakes' | 'starter' } & Omit<Props, 'mode'>) {
-  const queue = useMemo<Puzzle[]>(() => (source === 'starter' ? STARTER : duePuzzles()), [source]);
+function PuzzleSession({ source, ...shell }: { source: 'mistakes' | 'starter' | 'daily' } & Omit<Props, 'mode'>) {
+  const queue = useMemo<Puzzle[]>(
+    () => (source === 'starter' ? STARTER : source === 'daily' ? [todaysPuzzle().puzzle] : duePuzzles()),
+    [source],
+  );
+  const sourceTitle = source === 'starter' ? 'Starter puzzles' : source === 'daily' ? `Daily puzzle #${todaysPuzzle().number}` : 'Your mistakes';
   const engineRef = useRef<Engine | null>(null);
   const [index, setIndex] = useState(0);
   const [game, setGame] = useState(() => new Chess(queue[0]?.fen));
@@ -107,7 +114,7 @@ function PuzzleSession({ source, ...shell }: { source: 'mistakes' | 'starter' } 
     setArrows([]);
     setHint(false);
     setMissed(false);
-    beforeRef.current = source === 'mistakes' ? engineRef.current?.analyze(puzzle.fen, 900) ?? null : null;
+    beforeRef.current = source !== 'starter' ? engineRef.current?.analyze(puzzle.fen, 900) ?? null : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
@@ -134,10 +141,25 @@ function PuzzleSession({ source, ...shell }: { source: 'mistakes' | 'starter' } 
 
   const succeed = (text: string) => {
     setPhase('solved');
-    setMessage(text);
+    let extra = '';
+    if (source === 'daily') {
+      const before = dailyStatus();
+      const after = recordDaily(!missed);
+      if (!before.solvedToday) {
+        extra = after.streak > 1 ? ` That’s a ${after.streak}-day streak.` : ' Your streak starts today.';
+      }
+    }
+    setMessage(text + extra);
     setArrows([]);
     finish(true);
   };
+
+  const daily = source === 'daily' ? dailyStatus() : null;
+  const dailyNote = daily?.solvedToday
+    ? `Solved today${daily.firstTryToday ? ' on the first try' : ''}. A new puzzle arrives tomorrow.`
+    : daily && daily.streak > 0
+      ? `Solve it to keep your ${daily.streak}-day streak going.`
+      : 'A new puzzle every day, the same one for everyone. Solve it to start a streak.';
 
   const onMove = (from: Square, to: Square, promotion?: PieceSymbol) => {
     if (!puzzle || (phase !== 'solve' && phase !== 'wrong')) return;
@@ -213,7 +235,8 @@ function PuzzleSession({ source, ...shell }: { source: 'mistakes' | 'starter' } 
     return (
       <Shell
         {...shell}
-        title={source === 'starter' ? 'Starter puzzles' : 'Your mistakes'}
+        title={sourceTitle}
+        backLabel={source === 'daily' ? 'Menu' : 'Trainer'}
         board={
           <Board game={new Chess()} version={0} orientation="w" interactiveColor={null} lastMove={null} onMove={() => {}} className="main-board">
             <div className="result">
@@ -240,7 +263,8 @@ function PuzzleSession({ source, ...shell }: { source: 'mistakes' | 'starter' } 
   return (
     <Shell
       {...shell}
-      title={`${source === 'starter' ? 'Starter puzzles' : 'Your mistakes'}, ${index + 1} of ${queue.length}`}
+      backLabel={source === 'daily' ? 'Menu' : 'Trainer'}
+      title={source === 'daily' ? sourceTitle : `${sourceTitle}, ${index + 1} of ${queue.length}`}
       board={
         <Board
           game={game}
@@ -297,7 +321,9 @@ function PuzzleSession({ source, ...shell }: { source: 'mistakes' | 'starter' } 
             ))}
           </div>
           <p className="trainer-note">
-            {source === 'mistakes'
+            {source === 'daily'
+              ? dailyNote
+              : source === 'mistakes'
               ? 'Solve it on the first try and it comes back less often. Miss it and you’ll see it again soon.'
               : 'Classic checkmate patterns that come up in real games.'}
           </p>

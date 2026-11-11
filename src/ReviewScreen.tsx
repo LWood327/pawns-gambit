@@ -5,6 +5,7 @@ import { Engine, type Analysis } from './engine';
 import { IconBack, IconSound } from './icons';
 import { GRADE_LABEL, GRADE_MARK, chances, evalLabel, review, terminalAnalysis, type Grade, type Review } from './coach';
 import type { SavedGame } from './games';
+import { moveAccuracy } from './analysis';
 import { play } from './sound';
 
 interface Props {
@@ -14,11 +15,6 @@ interface Props {
   onExit: () => void;
 }
 
-/** Lichess-style move accuracy from the drop in winning chances (0..100 scale). */
-function moveAccuracy(winBefore: number, winAfter: number) {
-  const drop = Math.max(0, winBefore - winAfter);
-  return Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * drop) - 3.1669));
-}
 
 const GRAPH_W = 300;
 const GRAPH_H = 84;

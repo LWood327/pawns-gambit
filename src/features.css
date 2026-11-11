@@ -1,0 +1,485 @@
+/* ======================= Ladder ======================= */
+
+.ladder-intro {
+  margin-top: -6px;
+}
+
+.ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.rung {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 38px 1fr auto auto;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  text-align: left;
+  padding: 8px 12px 8px 6px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  transition:
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+
+.rung.open {
+  background: rgba(201, 167, 91, 0.1);
+  box-shadow: inset 0 0 0 2px var(--brass);
+}
+
+.rung.open:hover {
+  background: rgba(201, 167, 91, 0.18);
+}
+
+.rung.beaten:hover {
+  box-shadow: inset 0 0 0 1.5px rgba(234, 240, 236, 0.3);
+}
+
+.rung.locked {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.rung-rank {
+  grid-row: 1 / 3;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1;
+  text-align: center;
+  color: var(--brass-bright);
+}
+
+.rung.locked .rung-rank {
+  color: var(--chalk-muted);
+}
+
+.rung-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rung-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.rung-blurb {
+  font-size: 13px;
+  color: var(--chalk-muted);
+}
+
+.rung-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 12.5px;
+  color: var(--chalk-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rung-status {
+  min-width: 70px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.rung.beaten .rung-status {
+  color: var(--g-best);
+}
+
+.rung.open .rung-status {
+  color: var(--brass-bright);
+}
+
+.rung-prize {
+  grid-column: 2 / 5;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--brass);
+}
+
+.ladder-news {
+  margin: -1cqi 0 3.5cqi !important;
+  color: var(--brass-bright) !important;
+  font-weight: 700;
+}
+
+/* ======================= Daily puzzle card (home) ======================= */
+
+.daily-card {
+  margin-top: 14px;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  padding: 10px 16px 10px 12px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  transition: box-shadow 140ms ease;
+  animation: rise 520ms 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.daily-card:hover {
+  box-shadow: inset 0 0 0 1.5px var(--brass);
+}
+
+.daily-card.done {
+  opacity: 0.75;
+}
+
+.daily-streak {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 22px;
+}
+
+.daily-streak strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 20px;
+  color: var(--brass-bright);
+}
+
+.daily-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.daily-title {
+  font-weight: 700;
+}
+
+.daily-sub {
+  font-size: 13px;
+  color: var(--chalk-muted);
+}
+
+/* Six menu items now: tighten the spacing a little */
+.menu-item {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.wordmark {
+  font-size: clamp(56px, 7.4vw, 112px);
+  margin-bottom: clamp(18px, 3.5vh, 40px);
+}
+
+/* ======================= Progress ======================= */
+
+.progress-screen {
+  grid-template-rows: 56px 1fr;
+}
+
+.progress-body {
+  overflow-y: auto;
+  padding: 8px 32px 32px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  align-content: start;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(234, 240, 236, 0.18) transparent;
+}
+
+.pcard {
+  border-radius: 16px;
+  padding: 18px 20px;
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 0 0 1px var(--line);
+  min-width: 0;
+}
+
+.pcard.wide {
+  grid-column: 1 / -1;
+}
+
+.pcard h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--chalk-muted);
+}
+
+.pcard-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.delta {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.delta.up {
+  color: var(--g-best);
+}
+
+.delta.down {
+  color: var(--g-mistake);
+}
+
+.big-number {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 46px;
+  line-height: 1.05;
+  color: var(--brass-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.big-number .of {
+  font-size: 18px;
+  color: var(--chalk-muted);
+}
+
+.progress-chart {
+  width: 100%;
+  height: 150px;
+  display: block;
+  margin: 4px 0 8px;
+}
+
+.pc-area {
+  fill: rgba(201, 167, 91, 0.14);
+}
+
+.pc-line {
+  fill: none;
+  stroke: var(--brass-bright);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.pc-dot {
+  fill: var(--brass-bright);
+}
+
+.stat-pair {
+  display: grid;
+  gap: 6px;
+  color: var(--chalk-muted);
+}
+
+.stat-pair strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 30px;
+  color: var(--chalk);
+  margin-right: 6px;
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 140px;
+  margin: 8px 0;
+}
+
+.bar {
+  flex: 1;
+  max-width: 36px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  border-radius: 6px;
+  background: rgba(234, 240, 236, 0.05);
+  position: relative;
+  padding-bottom: 14px;
+}
+
+.bar:hover {
+  background: rgba(234, 240, 236, 0.1);
+}
+
+.bar-fill {
+  width: 100%;
+  border-radius: 6px 6px 2px 2px;
+  background: var(--g-good);
+  transition: height 500ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+.bar.win .bar-fill {
+  background: var(--g-best);
+}
+
+.bar.loss .bar-fill {
+  background: var(--g-blunder);
+  opacity: 0.85;
+}
+
+.bar-blunders {
+  position: absolute;
+  bottom: 0;
+  font-size: 12px;
+  line-height: 14px;
+  letter-spacing: -1px;
+  color: var(--g-blunder);
+}
+
+.mini-ladder {
+  display: flex;
+  gap: 5px;
+}
+
+.mini-ladder span {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(234, 240, 236, 0.14);
+}
+
+.mini-ladder span.on {
+  background: var(--brass);
+}
+
+.rivals {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.rivals li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 16px;
+  align-items: baseline;
+}
+
+.rival-name {
+  font-weight: 700;
+}
+
+.rival-record {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--brass-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 899px) {
+  .progress-body {
+    grid-template-columns: 1fr;
+    padding: 8px 16px 24px;
+  }
+}
+
+/* ======================= Online extras ======================= */
+
+.plate {
+  position: relative;
+}
+
+/* Emoji reactions float up from the sender's name plate */
+.reaction-spot {
+  position: absolute;
+  left: 44px;
+  bottom: 70%;
+  display: flex;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.reaction {
+  font-size: 30px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
+  animation: reaction-float 2.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes reaction-float {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1.15);
+  }
+  22% {
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-26px);
+  }
+}
+
+.react-bar {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+}
+
+.react-bar button {
+  font-size: 18px;
+  padding: 5px 0;
+  border-radius: 8px;
+  transition:
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.react-bar button:hover:not(:disabled) {
+  background: rgba(234, 240, 236, 0.08);
+  transform: scale(1.15);
+}
+
+.react-bar button:disabled {
+  opacity: 0.35;
+}
+
+/* Queued premove */
+.sq.premove::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(90, 150, 255, 0.42);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reaction {
+    animation: none;
+  }
+}
+
+/* Keep the six-item home menu within a normal window */
+.home-left {
+  padding-top: 28px;
+  padding-bottom: 28px;
+}
+
+.menu-view .wordmark {
+  font-size: clamp(50px, 6.4vw, 96px);
+}
+
+.menu-title {
+  font-size: clamp(22px, 2.1vw, 28px);
+}

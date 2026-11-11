@@ -493,3 +493,107 @@ html[data-theme='forest'] .piece.ghost {
 .themes-view .switch-row {
   margin-top: 4px;
 }
+
+/* ---------- Marble hall (ladder prize, rank 4) ---------- */
+html[data-theme='marble'],
+html[data-theme='marble'] .board {
+  --lamp: rgba(230, 236, 240, 0.12);
+  --sq-light: #eeebe4;
+  --sq-dark: #6d7a78;
+  --coord-on-light: #6d7a78;
+  --coord-on-dark: #eeebe4;
+  --last-move: rgba(214, 178, 92, 0.42);
+  --selected: rgba(214, 178, 92, 0.6);
+  --hint: rgba(30, 36, 38, 0.3);
+  --frame: #2c3133;
+  --frame-edge: #4b5357;
+  --piece-w-hi: #ffffff;
+  --piece-w-mid: #f4f1ea;
+  --piece-w-trim: #fbf9f4;
+  --piece-w-lo: #b9b4aa;
+  --piece-w-edge: #2c3133;
+  --piece-b-hi: #59646a;
+  --piece-b-mid: #22282a;
+  --piece-b-trim: #343c40;
+  --piece-b-lo: #0a0d0e;
+  --piece-b-edge: #d8d4cc;
+}
+
+html[data-theme='marble'] .squares::after {
+  background-image: var(--marble-veins, none);
+  background-size: 100% 100%;
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+
+html[data-theme='marble'] .board::before {
+  background-image: var(--grain), linear-gradient(160deg, var(--frame-edge), var(--frame) 45%, #15191a);
+  background-blend-mode: soft-light, normal;
+}
+
+html[data-theme='marble'] .piece.ghost {
+  animation-name: shatter;
+  animation-duration: 300ms;
+}
+
+/* ---------- Crown (ladder prize, rank 8) ---------- */
+html[data-theme='crown'],
+html[data-theme='crown'] .board {
+  --lamp: rgba(255, 205, 110, 0.16);
+  --sq-light: #ead39b;
+  --sq-dark: #5b2a6e;
+  --coord-on-light: #5b2a6e;
+  --coord-on-dark: #ead39b;
+  --last-move: rgba(255, 220, 120, 0.42);
+  --selected: rgba(255, 220, 120, 0.62);
+  --hint: rgba(40, 10, 50, 0.32);
+  --check: rgba(255, 70, 90, 0.9);
+  --frame: #8a6420;
+  --frame-edge: #e2b45a;
+  --piece-w-hi: #fffbe6;
+  --piece-w-mid: #ffe7a3;
+  --piece-w-trim: #fff3c9;
+  --piece-w-lo: #c8952c;
+  --piece-w-edge: #4a2c06;
+  --piece-b-hi: #7d4a96;
+  --piece-b-mid: #2a1236;
+  --piece-b-trim: #44205a;
+  --piece-b-lo: #0d0412;
+  --piece-b-edge: #f1cf7a;
+}
+
+html[data-theme='crown'] .board::before {
+  background-image: linear-gradient(160deg, var(--frame-edge), var(--frame) 45%, #4f3610);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 190, 0.5),
+    0 0 40px rgba(255, 200, 90, 0.25),
+    0 30px 70px rgba(0, 0, 0, 0.55);
+}
+
+html[data-theme='crown'] .piece-svg.white {
+  filter: drop-shadow(0 0 0.7cqi rgba(255, 210, 110, 0.55));
+}
+
+html[data-theme='crown'] .piece.ghost {
+  animation-name: collapse;
+  animation-duration: 420ms;
+}
+
+/* Locked themes in the gallery */
+.theme-item:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.theme-item:disabled .swatch-board {
+  filter: grayscale(0.8) brightness(0.7);
+}
+
+.theme-lock {
+  display: inline-block;
+  margin-left: 8px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-style: italic;
+  color: var(--brass);
+}

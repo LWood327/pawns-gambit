@@ -48,6 +48,8 @@ interface Handlers {
   onState: (s: RoomState, receivedAt: number) => void;
   onError: (message: string, fatal: boolean) => void;
   onStatus: (s: Status) => void;
+  /** A quick emoji from either player. */
+  onReaction?: (from: Color, emoji: string) => void;
 }
 
 export class OnlineClient {
@@ -90,6 +92,8 @@ export class OnlineClient {
         this.token = msg.token;
       } else if (msg.t === 'state') {
         this.h.onState(msg as RoomState, performance.now());
+      } else if (msg.t === 'reaction') {
+        this.h.onReaction?.(msg.from, msg.emoji);
       } else if (msg.t === 'error') {
         this.h.onError(msg.message, Boolean(msg.fatal) || !this.token);
       }
@@ -121,6 +125,8 @@ export class OnlineClient {
     this.ws?.close();
   }
 }
+
+export const REACTIONS = ['👍', '😮', '😂', '🔥', '😬', '👏', '🤝', '😭'];
 
 const NAME_KEY = 'chess-trainer:online-name';
 

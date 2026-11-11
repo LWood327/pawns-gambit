@@ -4,10 +4,10 @@ import { Board, type LastMove } from './Board';
 import { Piece } from './pieces';
 import { IconBack, IconFlag, IconFlip, IconSound } from './icons';
 import { captured, formatClock } from './GameScreen';
-import { OnlineClient, type RoomState, type StartRequest } from './online';
+import { OnlineClient, REACTIONS, type RoomState, type StartRequest } from './online';
 import { timeControl } from './settings';
 import { play } from './sound';
-import { saveGame, type SavedGame } from './games';
+import { recordLine, rivals, saveGame, type SavedGame } from './games';
 
 const LOW_TIME = 10_000;
 
@@ -18,7 +18,7 @@ function resultText(s: RoomState) {
   const moves = Math.ceil(s.moves.length / 2);
   switch (r.kind) {
     case 'checkmate':
-      return { title: 'Checkmate', detail: won ? `You beat ${them} in ${moves} moves.` : `${them} won in ${moves} moves.`, won };
+      return { title: 'Checkmate', detail: won ? `You beat ${them} in ${moves} ${moves === 1 ? "move" : "moves"}.` : `${them} won in ${moves} ${moves === 1 ? "move" : "moves"}.`, won };
     case 'resign':
       return { title: won ? 'You win' : 'Resigned', detail: won ? `${them} resigned.` : `You resigned. ${them} wins.`, won };
     case 'flag':
@@ -59,6 +59,9 @@ export function OnlineGame({ start, muted, onToggleMute, onExit, onReview }: Pro
   const [now, setNow] = useState(() => performance.now());
   const [copied, setCopied] = useState(false);
   const [draft, setDraft] = useState('');
+  const [reactions, setReactions] = useState<{ id: number; from: Color; emoji: string }[]>([]);
+  const [premove, setPremove] = useState<{ from: Square; to: Square; promotion?: PieceSymbol } | null>(null);
+  const lastReactAt = useRef(0);
   const moveIdRef = useRef(0);
   const movesSeen = useRef(0);
   const youRef = useRef<Color | null>(null);
@@ -111,6 +114,11 @@ export function OnlineGame({ start, muted, onToggleMute, onExit, onReview }: Pro
       },
       onError: (message, fatal) => setError({ message, fatal }),
       onStatus: setConn,
+      onReaction: (from, emoji) => {
+        const id = Date.now() + Math.random();
+        setReactions((r) => [...r.slice(-4), { id, from, emoji }]);
+        setTimeout(() => setReactions((r) => r.filter((x) => x.id !== id)), 2600);
+      },
     });
     clientRef.current = client;
     return () => client.close();
@@ -158,6 +166,29 @@ export function OnlineGame({ start, muted, onToggleMute, onExit, onReview }: Pro
 
   const send = (msg: Record<string, unknown>) => clientRef.current?.send(msg);
 
+  // A queued premove plays the moment it becomes your turn, if it's still legal.
+  useEffect(() => {
+    if (!premove || !myTurn || conn !== 'open') return;
+    const legal = game.moves({ square: premove.from, verbose: true }).some((m) => m.to === premove.to);
+    const p = premove;
+    setPremove(null);
+    if (legal) onMove(p.from, p.to, p.promotion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version, myTurn]);
+
+  const react = (emoji: string) => {
+    if (Date.now() - lastReactAt.current < 900) return;
+    lastReactAt.current = Date.now();
+    send({ t: 'react', emoji });
+  };
+
+  // Your record against this friend from earlier games.
+  const rival = useMemo(() => {
+    const name = state?.players[state.you === 'w' ? 'b' : 'w']?.name;
+    return name ? rivals().find((r) => r.name === name) ?? null : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.players.w?.name, state?.players.b?.name, state?.result]);
+
   const caps = useMemo(() => captured(game), [game, version]);
   const rows = useMemo(() => {
     const h = state?.moves ?? [];
@@ -203,6 +234,7 @@ export function OnlineGame({ start, muted, onToggleMute, onExit, onReview }: Pro
         player: state.you,
         opponent: state.players[state.you === 'w' ? 'b' : 'w']?.name ?? 'Friend',
         mode: 'online',
+        outcome: state.result.winner === null ? 'draw' : state.result.winner === state.you ? 'win' : 'loss',
         result: `${result.title}. ${result.detail}`,
       }),
     );
@@ -227,6 +259,15 @@ export function OnlineGame({ start, muted, onToggleMute, onExit, onReview }: Pro
     const left = remaining(color);
     return (
       <div className={`plate ${toMove ? 'to-move' : ''}`}>
+        <span className="reaction-spot" aria-live="polite">
+          {reactions
+            .filter((r) => r.from === color)
+            .map((r) => (
+              <span key={r.id} className="reaction">
+                {r.emoji}
+              </span>
+            ))}
+        </span>
         <div className="plate-who">
           <span className="plate-king">
             <Piece type="k" color={color} />
@@ -277,13 +318,21 @@ export function OnlineGame({ start, muted, onToggleMute, onExit, onReview }: Pro
           {plate(
             them,
             opponent?.name ?? 'Waiting for a player',
-            !opponent ? 'Not joined yet' : opponent.connected ? (them === 'w' ? 'White' : 'Black') : 'Reconnecting…',
+            !opponent
+              ? 'Not joined yet'
+              : !opponent.connected
+                ? 'Reconnecting…'
+                : `${them === 'w' ? 'White' : 'Black'}${rival ? `, your record ${recordLine(rival)}` : ''}`,
           )}
           <Board
             game={game}
             version={version}
             orientation={orientation}
             interactiveColor={myTurn && conn === 'open' ? you : null}
+            premoveColor={state && !over && !waiting ? you : null}
+            onPremove={(from, to, promotion) => setPremove({ from, to, promotion })}
+            onCancelPremove={() => setPremove(null)}
+            premove={premove}
             lastMove={lastMove}
             onMove={onMove}
             className="main-board"
@@ -405,6 +454,14 @@ export function OnlineGame({ start, muted, onToggleMute, onExit, onReview }: Pro
               />
             </form>
           </section>
+
+          <div className="react-bar" aria-label="Quick reactions">
+            {REACTIONS.map((e) => (
+              <button key={e} onClick={() => react(e)} disabled={!opponent || conn !== 'open'} aria-label={`Send ${e}`}>
+                {e}
+              </button>
+            ))}
+          </div>
 
           <div className="tools">
             <button onClick={() => send({ t: 'offer-draw' })} disabled={over || waiting || state?.drawOffer === you || !state?.moves.length}>

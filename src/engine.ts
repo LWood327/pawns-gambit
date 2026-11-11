@@ -1,12 +1,15 @@
 // Thin wrapper around the Stockfish web worker (UCI protocol).
 
 import { Chess } from 'chess.js';
+import { styleBonus, type Personality } from './personality';
 
 type Listener = (line: string) => void;
 
 export interface Strength {
   /** Roughly the rating the bot plays at. */
   elo: number;
+  /** Playing style (ladder opponents). Changes which good move gets played, not strength. */
+  style?: Personality;
 }
 
 export interface Analysis {
@@ -75,9 +78,11 @@ export function weakStyle(elo: number): WeakStyle {
 }
 
 /** A move made without calculating: any legal move, captures and checks a bit more likely. */
-function impulsiveMove(fen: string): string {
+function impulsiveMove(fen: string, style: Personality = 'balanced'): string {
   const moves = new Chess(fen).moves({ verbose: true });
-  const weights = moves.map((m) => (m.captured ? 3 : 1) * (m.san.includes('+') ? 2 : 1));
+  const weights = moves.map(
+    (m) => (m.captured ? 3 : 1) * (m.san.includes('+') ? 2 : 1) * Math.exp(styleBonus(fen, m.lan, style) / 60),
+  );
   let r = Math.random() * weights.reduce((s, w) => s + w, 0);
   for (let i = 0; i < moves.length; i++) {
     r -= weights[i];
@@ -149,8 +154,30 @@ export class Engine {
   }
 
   /** Returns the bot's move in UCI form, e.g. "e2e4" or "e7e8q". */
-  bestMove(fen: string, { elo }: Strength, maxMs = 800): Promise<string> {
-    if (elo < NATIVE_MIN_ELO) return this.weakMove(fen, weakStyle(elo));
+  bestMove(fen: string, { elo, style = 'balanced' }: Strength, maxMs = 800): Promise<string> {
+    if (elo < NATIVE_MIN_ELO) return this.weakMove(fen, weakStyle(elo), style);
+    const native = this.nativeMove(fen, elo, maxMs);
+    if (style === 'balanced') return native;
+    // Swap the calibrated move for an in-character one only if it's just as good.
+    return native.then(async (move) => {
+      const cands = await this.candidates(fen, 10, 5);
+      const mine = cands.find((c) => c.move === move);
+      if (!mine) return move;
+      let pick = move;
+      let bestFit = styleBonus(fen, move, style);
+      for (const c of cands) {
+        if (c.score < mine.score - 15) continue;
+        const fit = styleBonus(fen, c.move, style);
+        if (fit > bestFit) {
+          bestFit = fit;
+          pick = c.move;
+        }
+      }
+      return pick;
+    });
+  }
+
+  private nativeMove(fen: string, elo: number, maxMs: number): Promise<string> {
     return this.queue(async () => {
       await this.ready;
       this.send('setoption name MultiPV value 1');
@@ -165,10 +192,12 @@ export class Engine {
   }
 
   /** A human-like move for ratings below what Stockfish's limiter covers. */
-  async weakMove(fen: string, style: WeakStyle): Promise<string> {
-    if (Math.random() < style.random) return impulsiveMove(fen);
-    const cands = await this.candidates(fen, style.depth, style.lines);
-    return cands.length ? temperedPick(cands, style.temp) : impulsiveMove(fen);
+  async weakMove(fen: string, level: WeakStyle, style: Personality = 'balanced'): Promise<string> {
+    if (Math.random() < level.random) return impulsiveMove(fen, style);
+    const cands = await this.candidates(fen, level.depth, level.lines);
+    if (!cands.length) return impulsiveMove(fen, style);
+    const styled = style === 'balanced' ? cands : cands.map((c) => ({ ...c, score: c.score + styleBonus(fen, c.move, style) }));
+    return temperedPick(styled, level.temp);
   }
 
   /**

@@ -20,6 +20,9 @@ import { levelName, timeControl, type BotGameSettings } from './settings';
 import { play } from './sound';
 import { addMistake } from './trainer';
 import { saveGame, type SavedGame } from './games';
+import { BOSSES, recordLadderGame, type Boss } from './ladder';
+import { PERSONALITY_LABEL } from './personality';
+import { getTheme } from './themes';
 
 const PIECE_VALUE: Record<PieceSymbol, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const START_COUNT: Record<PieceSymbol, number> = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
@@ -53,17 +56,17 @@ export function captured(game: Chess) {
 
 type Ending = { kind: 'resign' } | { kind: 'flag'; color: Color } | null;
 
-function resultText(game: Chess, player: Color, ending: Ending) {
+function resultText(game: Chess, player: Color, ending: Ending, bot: string) {
   const moves = Math.ceil(game.history().length / 2);
-  if (ending?.kind === 'resign') return { title: 'Resigned', detail: 'The Pawn Master takes this one.', won: false };
+  if (ending?.kind === 'resign') return { title: 'Resigned', detail: `${bot} takes this one.`, won: false };
   if (ending?.kind === 'flag') {
     return ending.color === player
-      ? { title: 'Out of time', detail: 'Your clock ran out, so the Pawn Master wins.', won: false }
-      : { title: 'Out of time', detail: "The Pawn Master's clock ran out. You win.", won: true };
+      ? { title: 'Out of time', detail: `Your clock ran out, so ${bot} wins.`, won: false }
+      : { title: 'Out of time', detail: `${bot}’s clock ran out. You win.`, won: true };
   }
   if (game.isCheckmate()) {
     const won = game.turn() !== player;
-    return { title: 'Checkmate', detail: won ? `You won in ${moves} moves.` : `The Pawn Master won in ${moves} moves.`, won };
+    return { title: 'Checkmate', detail: won ? `You won in ${moves} ${moves === 1 ? "move" : "moves"}.` : `${bot} won in ${moves} ${moves === 1 ? "move" : "moves"}.`, won };
   }
   if (game.isStalemate()) return { title: 'Stalemate', detail: 'No legal moves and no check, so it’s a draw.', won: false };
   if (game.isThreefoldRepetition()) return { title: 'Draw', detail: 'The same position came up three times.', won: false };
@@ -87,9 +90,18 @@ interface Props {
   onToggleMute: () => void;
   onExit: () => void;
   onReview: (g: SavedGame) => void;
+  /** Set for ladder games: who you're playing, and fixed fair rules. */
+  boss?: Boss;
+  /** Ladder only: go straight to the next rank after a win. */
+  onNextRank?: (next: Boss) => void;
 }
 
-export function GameScreen({ settings, muted, onToggleMute, onExit, onReview }: Props) {
+export function GameScreen({ settings: chosen, muted, onToggleMute, onExit, onReview, boss, onNextRank }: Props) {
+  // Ladder games: no clock, no coach, no undo, colors drawn at random.
+  const settings: BotGameSettings = boss
+    ? { ...chosen, elo: boss.elo, timeId: 'none', side: 'random', coach: false, secondChances: false }
+    : chosen;
+  const botName = boss?.name ?? 'The Pawn Master';
   const tc = timeControl(settings.timeId);
   const timed = tc.base > 0;
 
@@ -218,7 +230,7 @@ export function GameScreen({ settings, muted, onToggleMute, onExit, onReview }: 
     const botLeft = timed ? clockRef.current[botColor] : Infinity;
     const budget = Math.max(80, Math.min(800, botLeft / 40));
     engine
-      .bestMove(game.fen(), { elo: settings.elo }, budget)
+      .bestMove(game.fen(), { elo: settings.elo, style: boss?.style }, budget)
       .then(async (uci) => {
         // Short pause so instant replies don't feel jarring; skipped when short on time.
         // Lower levels answer almost instantly now, so give them a human-looking pause.
@@ -404,21 +416,28 @@ export function GameScreen({ settings, muted, onToggleMute, onExit, onReview }: 
   }, [rows.length]);
 
   const caps = useMemo(() => captured(game), [game, version]);
-  const result = over ? resultText(game, player, ending) : null;
+  const result = over ? resultText(game, player, ending, botName) : null;
 
   // Keep each finished game so it can be reviewed now or later from the Trainer.
   const [savedGame, setSavedGame] = useState<SavedGame | null>(null);
+  /** Ladder: whether this win newly unlocked the next rank. */
+  const [freshWin, setFreshWin] = useState(false);
   const resultKey = result ? `${result.title}|${history.length}` : '';
   useEffect(() => {
     if (!result) {
       setSavedGame(null);
+      setFreshWin(false);
       return;
     }
+    if (boss) setFreshWin(recordLadderGame(boss.rank, result.won));
     setSavedGame(
       saveGame({
         moves: game.history(),
         player,
-        opponent: `The Pawn Master (${settings.elo})`,
+        opponent: `${botName} (${settings.elo})`,
+        botElo: settings.elo,
+        outcome: result.won ? 'win' : game.isDraw() || game.isStalemate() ? 'draw' : 'loss',
+        ladderRank: boss?.rank,
         mode: 'bot',
         result: `${result.title}. ${result.detail}`,
       }),
@@ -427,7 +446,7 @@ export function GameScreen({ settings, muted, onToggleMute, onExit, onReview }: 
   }, [resultKey]);
 
   const playerHasMoved = history.length > (player === 'w' ? 0 : 1);
-  const canTakeBack = !timed && !thinking && ending === null && playerHasMoved && gate !== 'waiting';
+  const canTakeBack = !boss && !timed && !thinking && ending === null && playerHasMoved && gate !== 'waiting';
 
   // Coach visuals
   const latest = latestPly !== null ? reviews[latestPly] : null;
@@ -454,10 +473,10 @@ export function GameScreen({ settings, muted, onToggleMute, onExit, onReview }: 
   );
 
   let status: string;
-  if (engineError) status = 'The Pawn Master could not start. Restart the app to try again.';
+  if (engineError) status = `${botName} could not start. Restart the app to try again.`;
   else if (result) status = result.detail;
-  else if (gate === 'prompt') status = 'The Pawn Master is waiting for you';
-  else if (thinking) status = 'The Pawn Master is thinking';
+  else if (gate === 'prompt') status = `${botName} is waiting for you`;
+  else if (thinking) status = `${botName} is thinking`;
   else if (game.inCheck()) status = 'You’re in check';
   else if (timed && clockRef.current.turnStart === null && player === 'w') status = 'Your move. Clocks start after it.';
   else status = 'Your move';
@@ -503,7 +522,7 @@ export function GameScreen({ settings, muted, onToggleMute, onExit, onReview }: 
           <IconBack /> Menu
         </button>
         <span className="topbar-title">
-          Against the computer{timed ? `, ${tc.label}` : ''}
+          {boss ? `Climb the ranks, rank ${boss.rank} of 8` : `Against the computer${timed ? `, ${tc.label}` : ''}`}
         </span>
         <button className="icon-btn" onClick={onToggleMute} aria-label={muted ? 'Turn sound on' : 'Turn sound off'} title={muted ? 'Sound off' : 'Sound on'}>
           <IconSound muted={muted} />
@@ -512,7 +531,7 @@ export function GameScreen({ settings, muted, onToggleMute, onExit, onReview }: 
 
       <div className="game-body">
         <div className="board-col">
-          {plate(botColor, 'The Pawn Master', `${levelName(settings.elo)}, about ${settings.elo}`)}
+          {plate(botColor, botName, boss ? `Rank ${boss.rank}, ${PERSONALITY_LABEL[boss.style].toLowerCase()}, about ${boss.elo}` : `${levelName(settings.elo)}, about ${settings.elo}`)}
           <div className="board-wrap">
           {coachOn && (
             <div className={`evalbar ${orientation === 'b' ? 'flipped' : ''}`} aria-label={`Evaluation ${evalWhite?.label ?? ''}`}>
@@ -552,17 +571,33 @@ export function GameScreen({ settings, muted, onToggleMute, onExit, onReview }: 
                     )}
                   </ul>
                 )}
+                {boss && result.won && (
+                  <p className="ladder-news">
+                    {boss.rank === 8
+                      ? 'You reached the eighth rank. Promotion earned.'
+                      : freshWin
+                        ? `Rank ${boss.rank + 1} unlocked: ${BOSSES[boss.rank].name} awaits.`
+                        : `You’ve beaten ${boss.name} before. Rank ${boss.rank + 1} is open.`}
+                    {freshWin && boss.reward && ` New board theme: ${getTheme(boss.reward).name}.`}
+                  </p>
+                )}
                 <div className="result-actions">
-                  <button className="primary" onClick={rematch}>
-                    Rematch
-                  </button>
+                  {boss && result.won && boss.rank < 8 && onNextRank ? (
+                    <button className="primary" onClick={() => onNextRank(BOSSES[boss.rank])}>
+                      Next rank
+                    </button>
+                  ) : (
+                    <button className="primary" onClick={rematch}>
+                      {boss ? 'Try again' : 'Rematch'}
+                    </button>
+                  )}
                   {savedGame && (
                     <button className="secondary" onClick={() => onReview(savedGame)}>
                       Review game
                     </button>
                   )}
                   <button className="secondary" onClick={onExit}>
-                    Menu
+                    {boss ? 'Ladder' : 'Menu'}
                   </button>
                 </div>
               </div>
@@ -624,7 +659,7 @@ export function GameScreen({ settings, muted, onToggleMute, onExit, onReview }: 
           )}
 
           <ol className="scoresheet" ref={scoreRef}>
-            {rows.length === 0 && <li className="empty">Your moves and the Pawn Master’s will be written here.</li>}
+            {rows.length === 0 && <li className="empty">Your moves and {botName}’s will be written here.</li>}
             {rows.map((r, i) => {
               const cell = (ply: number, san?: string) => {
                 const rv = reviews[ply];

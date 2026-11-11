@@ -6,6 +6,7 @@ import './styles.css';
 import './themes.css';
 import './online.css';
 import './trainer.css';
+import './features.css';
 import App from './App';
 import { loadThemePrefs } from './themes';
 

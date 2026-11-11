@@ -108,6 +108,45 @@ type Voice = Record<SoundKind, () => void>;
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
 const VOICES: Record<string, Voice> = {
+  // Crisp stone clicks.
+  marble: {
+    move: () => {
+      noise({ dur: 0.03, filter: 'highpass', freq: 2600, gain: 0.35, curve: 4 });
+      tone({ from: 520, to: 380, dur: 0.07, gain: 0.25 });
+    },
+    capture: () => {
+      noise({ dur: 0.04, filter: 'highpass', freq: 2200, gain: 0.45, curve: 4 });
+      tone({ from: 600, to: 300, dur: 0.1, gain: 0.3 });
+      noise({ dur: 0.03, filter: 'highpass', freq: 3000, gain: 0.25, curve: 4, at: 0.05 });
+    },
+    check: () => {
+      tone({ from: 880, dur: 0.12, gain: 0.15 });
+      tone({ from: 1175, dur: 0.16, gain: 0.12, at: 0.08 });
+    },
+    end: () => [659, 784, 988].forEach((f, i) => tone({ from: f, dur: 0.5, gain: 0.12, at: i * 0.13 })),
+    'low-time': () => tone({ from: 1400, dur: 0.05, gain: 0.1 }),
+  },
+
+  // Soft bell chimes.
+  crown: {
+    move: () => {
+      const f = rnd(1040, 1110);
+      tone({ from: f, dur: 0.45, gain: 0.12 });
+      tone({ from: f * 2.01, dur: 0.25, gain: 0.05 });
+      knock(0, 1.1, 0.2);
+    },
+    capture: () => {
+      [1319, 1568, 2093].forEach((f, i) => tone({ from: f, dur: 0.5, gain: 0.09, at: i * 0.05 }));
+      knock(0, 1.2, 0.3);
+    },
+    check: () => {
+      tone({ from: 1568, dur: 0.6, gain: 0.12 });
+      tone({ from: 2093, dur: 0.6, gain: 0.1, at: 0.12 });
+    },
+    end: () => [1047, 1319, 1568, 2093, 2637].forEach((f, i) => tone({ from: f, dur: 1, gain: 0.09, at: i * 0.12 })),
+    'low-time': () => tone({ from: 2093, dur: 0.08, gain: 0.08 }),
+  },
+
   walnut: {
     move: () => knock(),
     capture: () => {
