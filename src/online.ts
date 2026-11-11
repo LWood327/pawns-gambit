@@ -1,4 +1,4 @@
-// Connection to the Pawn's Gambit room server, with automatic reconnect.
+// Connection to the Eighth Rank room server, with automatic reconnect.
 
 import type { Color } from 'chess.js';
 

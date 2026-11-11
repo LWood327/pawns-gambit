@@ -350,8 +350,8 @@ export function Home({
         {view === 'menu' ? (
           <div className="menu-view" key="menu">
             <h1 className="wordmark">
-              <span>Pawn’s</span>
-              <span>Gambit</span>
+              <span>Eighth</span>
+              <span>Rank</span>
             </h1>
             <nav className="menu" aria-label="Main menu">
               {items.map((it) => (

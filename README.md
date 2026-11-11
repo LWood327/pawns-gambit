@@ -1,4 +1,4 @@
-# Pawn’s Gambit
+# Eighth Rank
 
 A desktop chess app for practicing against Stockfish.
 

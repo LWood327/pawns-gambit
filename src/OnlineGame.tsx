@@ -299,7 +299,7 @@ export function OnlineGame({ start, muted, onToggleMute, onExit, onReview }: Pro
                         {copied ? 'Copied' : 'Copy code'}
                       </button>
                     </div>
-                    <p className="lobby-hint">They open Pawn’s Gambit, choose Play a friend online, and enter it under Join a match.</p>
+                    <p className="lobby-hint">They open Eighth Rank, choose Play a friend online, and enter it under Join a match.</p>
                   </>
                 ) : (
                   <p>{status}</p>

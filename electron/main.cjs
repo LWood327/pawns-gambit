@@ -5,6 +5,10 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const isDev = process.argv.includes('--dev');
+
+// The app was first released as "Pawn's Gambit". Keep using that data folder so
+// settings, saved puzzles, opening stars and past games carry over after the rename.
+app.setPath('userData', path.join(app.getPath('appData'), "Pawn's Gambit"));
 const distDir = path.join(__dirname, '..', 'dist');
 
 // Only load the app's own files; 'wasm-unsafe-eval' lets Stockfish's WebAssembly run.
@@ -30,7 +34,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 640,
     backgroundColor: '#15302A',
-    title: 'Pawn’s Gambit',
+    title: 'Eighth Rank',
     autoHideMenuBar: true,
     webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname, 'preload.cjs') },
   });
