@@ -343,6 +343,9 @@ export function Home({
 
   return (
     <div className="home">
+      <span className="app-version" title="Installed version">
+        v{__APP_VERSION__}
+      </span>
       <div className="home-left">
         {view === 'menu' ? (
           <div className="menu-view" key="menu">

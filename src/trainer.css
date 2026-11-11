@@ -306,3 +306,21 @@
   font-size: 13px;
   color: var(--chalk-muted);
 }
+
+/* Version tag in the corner of the home screen */
+.home {
+  position: relative;
+}
+
+.app-version {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  font-size: 12px;
+  color: var(--chalk-muted);
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  user-select: text;
+}

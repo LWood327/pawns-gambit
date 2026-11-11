@@ -221,7 +221,8 @@ export function GameScreen({ settings, muted, onToggleMute, onExit, onReview }: 
       .bestMove(game.fen(), { elo: settings.elo }, budget)
       .then(async (uci) => {
         // Short pause so instant replies don't feel jarring; skipped when short on time.
-        const pause = timed && botLeft < 30_000 ? 0 : 350;
+        // Lower levels answer almost instantly now, so give them a human-looking pause.
+        const pause = timed && botLeft < 30_000 ? 0 : settings.elo < 1350 ? 450 + Math.random() * 800 : 350;
         const wait = pause - (performance.now() - started);
         if (wait > 0) await new Promise((r) => setTimeout(r, wait));
         if (id !== gameIdRef.current) return;
